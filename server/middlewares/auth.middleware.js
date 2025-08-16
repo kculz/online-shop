@@ -27,7 +27,7 @@ function verify(req, res, next) {
 // Allow other system users that are not registered as Clients or Transporters
 function verifyAdmin(req, res, next) {
   verify(req, res, () => {
-    if (req.user.role === 'admin') {
+    if (req.user.role == 'admin') {
       next();
     } else {
       return res

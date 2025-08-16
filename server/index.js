@@ -13,6 +13,7 @@ app.get('/', (req, res) => {
     res.send('Welcome to the Online Shop API');
 });
 app.use('/api/auth', require('./routes/auth.route'));
+app.use('/api/categories', require('./routes/category.route'));
 
 db.sequelize.sync().then(() => {
     console.log('Database connected successfully');
