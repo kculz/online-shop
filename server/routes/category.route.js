@@ -5,14 +5,14 @@ const { CategoryController } = require('../controller/category.controller');
 const { verify, verifyAdmin } = require('../middlewares/auth.middleware');
 
 // Route to create a new category
-router.post('/', verify, CategoryController.createCategory);
+router.post('/', verify, verifyAdmin, CategoryController.createCategory);
 // Route to get all categories
 router.get('/', verify, CategoryController.getCategories);
 // Route to get a category by ID
-router.get('/:id', verify, CategoryController.getCategoryById);
+router.get('/:id', CategoryController.getCategoryById);
 // Route to update a category by ID
-router.put('/:id', verifyAdmin, CategoryController.updateCategory);
+router.put('/:id',verify, verifyAdmin, CategoryController.updateCategory);
 // Route to delete a category by ID
-router.delete('/:id', verifyAdmin, CategoryController.deleteCategory);
+router.delete('/:id',verify, verifyAdmin, CategoryController.deleteCategory);
 
 module.exports = router;

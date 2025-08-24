@@ -17,6 +17,8 @@ app.use('/api/categories', require('./routes/category.route'));
 app.use('/api/products', require('./routes/product.route'));
 app.use('/api/cart', require('./routes/cart.route'));
 app.use('/api/orders', require('./routes/order.route'));
+app.use('/api/rentals', require('./routes/rental.route'));
+app.use('/api/users', require('./routes/user.route'));
 
 db.sequelize.sync().then(() => {
     console.log('Database connected successfully');

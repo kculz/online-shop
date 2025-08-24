@@ -1,6 +1,4 @@
-// routes/orderRoutes.js
-const express = require('express');
-const router = express.Router();
+const router = require('express').Router();
 const orderController = require('../controller/order.controller');
 const {verify} = require('../middlewares/auth.middleware');
 
