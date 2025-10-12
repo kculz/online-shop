@@ -1,3 +1,6 @@
+// ============================================
+// stores/selectors/authSelector.js
+// ============================================
 export const authSelectors = {
   // Select user
   user: (state) => state.user,
@@ -19,4 +22,10 @@ export const authSelectors = {
   
   // Check if user is admin
   isAdmin: (state) => state.user?.role === 'admin',
+  
+  // Get user email
+  userEmail: (state) => state.user?.email,
+  
+  // Get username
+  username: (state) => state.user?.username,
 };

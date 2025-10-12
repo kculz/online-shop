@@ -1,3 +1,6 @@
+// ============================================
+// services/api.js
+// ============================================
 import axios from 'axios';
 
 const API_BASE_URL = 'http://localhost:3000/api';
@@ -24,14 +27,10 @@ api.interceptors.request.use(
 
 // Auth API methods
 export const authAPI = {
-  login: (credentials) => api.post('/auth/login', credentials),
-  register: (userData) => api.post('/auth/register', userData),
-  verifyToken: (token) => api.get('/auth/verify', {
-    headers: { Authorization: `Bearer ${token}` }
-  }),
-  updateProfile: (userData, token) => api.put('/auth/profile', userData, {
-    headers: { Authorization: `Bearer ${token}` }
-  }),
+  signin: (credentials) => api.post('/auth/signin', credentials),
+  signup: (userData) => api.post('/auth/signup', userData),
+  verifyToken: () => api.get('/auth/verify'),
+  logout: () => api.post('/auth/logout'),
 };
 
 export default api;

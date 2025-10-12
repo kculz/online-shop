@@ -1,3 +1,6 @@
+// ============================================
+// stores/slices/authSlice.js
+// ============================================
 import { createAuthActions } from '../actions/authAction';
 
 // Initial state

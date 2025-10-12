@@ -1,29 +1,52 @@
+// ============================================
+// pages/Login.jsx
+// ============================================
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   FaEnvelope,
   FaLock,
-  FaGoogle,
-  FaFacebook,
-  FaApple,
+  FaUser,
   FaEye,
   FaEyeSlash,
   FaShieldAlt,
   FaArrowLeft
 } from 'react-icons/fa';
+import useStore from '../stores/store';
 
 const Login = () => {
+  const navigate = useNavigate();
+  const { signin, isLoading, error, clearError } = useStore();
+  
   const [showPassword, setShowPassword] = useState(false);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [formData, setFormData] = useState({
+    username: '',
+    password: '',
+  });
   const [rememberMe, setRememberMe] = useState(false);
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    console.log('Login submitted:', { email, password, rememberMe });
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+    if (error) clearError();
   };
 
-  const handleSocialLogin = (provider) => {
-    console.log('Social login with:', provider);
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (!formData.username || !formData.password) {
+      return;
+    }
+
+    const result = await signin({
+      username: formData.username,
+      password: formData.password,
+    });
+
+    if (result.success) {
+      // Navigate to home or dashboard
+      navigate('/');
+    }
   };
 
   return (
@@ -36,7 +59,10 @@ const Login = () => {
 
       <div className="relative w-full max-w-md">
         {/* Back Button */}
-        <button className="mb-6 flex items-center gap-2 text-white hover:text-gray-200 transition-colors">
+        <button 
+          onClick={() => navigate('/')}
+          className="mb-6 flex items-center gap-2 text-white hover:text-gray-200 transition-colors"
+        >
           <FaArrowLeft />
           <span className="font-medium">Back to Home</span>
         </button>
@@ -49,28 +75,36 @@ const Login = () => {
               <FaShieldAlt className="text-3xl text-blue-600" />
             </div>
             <h1 className="text-3xl font-bold text-white mb-2">Welcome Back</h1>
-            <p className="text-blue-100">Sign in to your account to continue</p>
+            <p className="text-blue-100">Sign in to continue shopping</p>
           </div>
 
           {/* Form */}
           <div className="p-8">
+            {error && (
+              <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-sm text-red-600">{error}</p>
+              </div>
+            )}
+
             <div className="space-y-6">
-              {/* Email Input */}
+              {/* Username Input */}
               <div>
-                <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-                  Email Address
+                <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-2">
+                  Username
                 </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                    <FaEnvelope className="text-gray-400" />
+                    <FaUser className="text-gray-400" />
                   </div>
                   <input
-                    type="email"
-                    id="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    type="text"
+                    id="username"
+                    name="username"
+                    value={formData.username}
+                    onChange={handleInputChange}
                     className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                    placeholder="you@example.com"
+                    placeholder="Enter your username"
+                    disabled={isLoading}
                   />
                 </div>
               </div>
@@ -87,10 +121,12 @@ const Login = () => {
                   <input
                     type={showPassword ? 'text' : 'password'}
                     id="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    name="password"
+                    value={formData.password}
+                    onChange={handleInputChange}
                     className="w-full pl-12 pr-12 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                     placeholder="Enter your password"
+                    disabled={isLoading}
                   />
                   <button
                     type="button"
@@ -113,7 +149,10 @@ const Login = () => {
                   />
                   <span className="ml-2 text-sm text-gray-600">Remember me</span>
                 </label>
-                <button className="text-sm text-blue-600 hover:text-blue-700 font-medium">
+                <button 
+                  type="button"
+                  className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                >
                   Forgot password?
                 </button>
               </div>
@@ -121,21 +160,21 @@ const Login = () => {
               {/* Submit Button */}
               <button
                 onClick={handleSubmit}
-                className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 rounded-lg font-semibold hover:from-blue-700 hover:to-purple-700 transform hover:scale-[1.02] transition-all shadow-lg"
+                disabled={isLoading}
+                className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 rounded-lg font-semibold hover:from-blue-700 hover:to-purple-700 transform hover:scale-[1.02] transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Sign In
+                {isLoading ? 'Signing in...' : 'Sign In'}
               </button>
             </div>
-
-            
-
-            
 
             {/* Sign Up Link */}
             <div className="mt-8 text-center">
               <p className="text-gray-600">
                 Don't have an account?{' '}
-                <button className="text-blue-600 hover:text-blue-700 font-semibold">
+                <button 
+                  onClick={() => navigate('/register')}
+                  className="text-blue-600 hover:text-blue-700 font-semibold"
+                >
                   Sign up for free
                 </button>
               </p>

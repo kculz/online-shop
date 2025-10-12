@@ -1,48 +1,70 @@
+// ============================================
+// pages/Register.jsx
+// ============================================
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   FaUser,
   FaEnvelope,
   FaLock,
-  FaPhone,
   FaEye,
   FaEyeSlash,
   FaShieldAlt,
   FaArrowLeft,
-  FaCheckCircle,
-  FaMapMarkerAlt
+  FaCheckCircle
 } from 'react-icons/fa';
+import useStore from '../stores/store';
 
 const Register = () => {
+  const navigate = useNavigate();
+  const { signup, isLoading, error, clearError } = useStore();
+  
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [formData, setFormData] = useState({
-    firstName: '',
-    lastName: '',
+    username: '',
     email: '',
-    phone: '',
-    address: '',
-    city: '',
-    country: '',
     password: '',
-    confirmPassword: ''
+    confirmPassword: '',
+    role: 'user'
   });
   const [agreeToTerms, setAgreeToTerms] = useState(false);
   const [subscribeNewsletter, setSubscribeNewsletter] = useState(true);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    setFormData(prev => ({ ...prev, [name]: value }));
+    if (error) clearError();
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    if (!formData.username || !formData.email || !formData.password) {
+      return;
+    }
+
+    if (formData.password !== formData.confirmPassword) {
+      alert('Passwords do not match');
+      return;
+    }
+
     if (!agreeToTerms) {
       alert('Please agree to the terms and conditions');
       return;
     }
-    console.log('Register submitted:', formData);
+
+    const result = await signup({
+      username: formData.username,
+      email: formData.email,
+      password: formData.password,
+      role: formData.role
+    });
+
+    if (result.success) {
+      // Navigate to home or dashboard
+      navigate('/');
+    }
   };
 
   return (
@@ -51,12 +73,14 @@ const Register = () => {
       <div className="absolute inset-0 overflow-hidden">
         <div className="absolute top-10 left-10 w-80 h-80 bg-white opacity-10 rounded-full blur-3xl animate-pulse"></div>
         <div className="absolute bottom-10 right-10 w-96 h-96 bg-teal-300 opacity-10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1.5s' }}></div>
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-blue-300 opacity-10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '0.5s' }}></div>
       </div>
 
       <div className="relative w-full max-w-2xl">
         {/* Back Button */}
-        <button className="mb-6 flex items-center gap-2 text-white hover:text-gray-200 transition-colors">
+        <button 
+          onClick={() => navigate('/')}
+          className="mb-6 flex items-center gap-2 text-white hover:text-gray-200 transition-colors"
+        >
           <FaArrowLeft />
           <span className="font-medium">Back to Home</span>
         </button>
@@ -69,59 +93,44 @@ const Register = () => {
               <FaUser className="text-3xl text-green-600" />
             </div>
             <h1 className="text-3xl font-bold text-white mb-2">Create Account</h1>
-            <p className="text-green-100">Join us and start your tech journey today</p>
+            <p className="text-green-100">Join our shop and start shopping today</p>
           </div>
 
           {/* Form */}
           <div className="p-8">
-            <div className="space-y-5">
-              {/* Name Fields */}
-              <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <label htmlFor="firstName" className="block text-sm font-medium text-gray-700 mb-2">
-                    First Name
-                  </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                      <FaUser className="text-gray-400" />
-                    </div>
-                    <input
-                      type="text"
-                      id="firstName"
-                      name="firstName"
-                      value={formData.firstName}
-                      onChange={handleInputChange}
-                      className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
-                      placeholder="John"
-                    />
-                  </div>
-                </div>
+            {error && (
+              <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-sm text-red-600">{error}</p>
+              </div>
+            )}
 
-                <div>
-                  <label htmlFor="lastName" className="block text-sm font-medium text-gray-700 mb-2">
-                    Last Name
-                  </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                      <FaUser className="text-gray-400" />
-                    </div>
-                    <input
-                      type="text"
-                      id="lastName"
-                      name="lastName"
-                      value={formData.lastName}
-                      onChange={handleInputChange}
-                      className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
-                      placeholder="Doe"
-                    />
+            <div className="space-y-5">
+              {/* Username Input */}
+              <div>
+                <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-2">
+                  Username *
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                    <FaUser className="text-gray-400" />
                   </div>
+                  <input
+                    type="text"
+                    id="username"
+                    name="username"
+                    value={formData.username}
+                    onChange={handleInputChange}
+                    className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
+                    placeholder="Choose a username"
+                    disabled={isLoading}
+                  />
                 </div>
               </div>
 
               {/* Email Input */}
               <div>
                 <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-                  Email Address
+                  Email Address *
                 </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
@@ -134,82 +143,8 @@ const Register = () => {
                     value={formData.email}
                     onChange={handleInputChange}
                     className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
-                    placeholder="john.doe@example.com"
-                  />
-                </div>
-              </div>
-
-              {/* Phone Input */}
-              <div>
-                <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-2">
-                  Phone Number
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                    <FaPhone className="text-gray-400" />
-                  </div>
-                  <input
-                    type="tel"
-                    id="phone"
-                    name="phone"
-                    value={formData.phone}
-                    onChange={handleInputChange}
-                    className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
-                    placeholder="+1 (555) 123-4567"
-                  />
-                </div>
-              </div>
-
-              {/* Address Input */}
-              <div>
-                <label htmlFor="address" className="block text-sm font-medium text-gray-700 mb-2">
-                  Street Address
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                    <FaMapMarkerAlt className="text-gray-400" />
-                  </div>
-                  <input
-                    type="text"
-                    id="address"
-                    name="address"
-                    value={formData.address}
-                    onChange={handleInputChange}
-                    className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
-                    placeholder="123 Main Street, Apt 4B"
-                  />
-                </div>
-              </div>
-
-              {/* City and Country */}
-              <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <label htmlFor="city" className="block text-sm font-medium text-gray-700 mb-2">
-                    City
-                  </label>
-                  <input
-                    type="text"
-                    id="city"
-                    name="city"
-                    value={formData.city}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
-                    placeholder="New York"
-                  />
-                </div>
-
-                <div>
-                  <label htmlFor="country" className="block text-sm font-medium text-gray-700 mb-2">
-                    Country
-                  </label>
-                  <input
-                    type="text"
-                    id="country"
-                    name="country"
-                    value={formData.country}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
-                    placeholder="United States"
+                    placeholder="you@example.com"
+                    disabled={isLoading}
                   />
                 </div>
               </div>
@@ -218,7 +153,7 @@ const Register = () => {
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
                   <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
-                    Password
+                    Password *
                   </label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
@@ -232,6 +167,7 @@ const Register = () => {
                       onChange={handleInputChange}
                       className="w-full pl-12 pr-12 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
                       placeholder="••••••••"
+                      disabled={isLoading}
                     />
                     <button
                       type="button"
@@ -245,7 +181,7 @@ const Register = () => {
 
                 <div>
                   <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-2">
-                    Confirm Password
+                    Confirm Password *
                   </label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
@@ -259,6 +195,7 @@ const Register = () => {
                       onChange={handleInputChange}
                       className="w-full pl-12 pr-12 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
                       placeholder="••••••••"
+                      disabled={isLoading}
                     />
                     <button
                       type="button"
@@ -305,11 +242,11 @@ const Register = () => {
                   />
                   <span className="ml-3 text-sm text-gray-600">
                     I agree to the{' '}
-                    <button className="text-green-600 hover:text-green-700 font-medium">
+                    <button type="button" className="text-green-600 hover:text-green-700 font-medium">
                       Terms of Service
                     </button>
                     {' '}and{' '}
-                    <button className="text-green-600 hover:text-green-700 font-medium">
+                    <button type="button" className="text-green-600 hover:text-green-700 font-medium">
                       Privacy Policy
                     </button>
                   </span>
@@ -331,9 +268,10 @@ const Register = () => {
               {/* Submit Button */}
               <button
                 onClick={handleSubmit}
-                className="w-full bg-gradient-to-r from-green-600 to-teal-600 text-white py-3 rounded-lg font-semibold hover:from-green-700 hover:to-teal-700 transform hover:scale-[1.02] transition-all shadow-lg mt-6"
+                disabled={isLoading}
+                className="w-full bg-gradient-to-r from-green-600 to-teal-600 text-white py-3 rounded-lg font-semibold hover:from-green-700 hover:to-teal-700 transform hover:scale-[1.02] transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed mt-6"
               >
-                Create Account
+                {isLoading ? 'Creating Account...' : 'Create Account'}
               </button>
             </div>
 
@@ -341,7 +279,10 @@ const Register = () => {
             <div className="mt-6 text-center">
               <p className="text-gray-600">
                 Already have an account?{' '}
-                <button className="text-green-600 hover:text-green-700 font-semibold">
+                <button 
+                  onClick={() => navigate('/login')}
+                  className="text-green-600 hover:text-green-700 font-semibold"
+                >
                   Sign in here
                 </button>
               </p>

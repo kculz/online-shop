@@ -1,30 +1,33 @@
+// ============================================
 // stores/store.js
+// ============================================
 import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
 import { authSlice } from './slices/authSlice';
-// import { uiSlice } from './slices/uiSlice';
-// import { cartSlice } from './slices/cartSlice';
 
-// Combine all slices into a single store
-export const useStore = create()(
+// Combine all slices
+const useStore = create(
   devtools(
     persist(
-      (...a) => ({
-        ...authSlice(...a),
-        // ...uiSlice(...a),
-        // ...cartSlice(...a),
+      (set, get) => ({
+        // Auth slice
+        ...authSlice(set, get),
+        
+        // Add other slices here as needed
+        // ...cartSlice(set, get),
+        // ...productSlice(set, get),
       }),
       {
-        name: 'app-storage',
+        name: 'online-shop-storage',
         partialize: (state) => ({
-          auth: {
-            user: state.user,
-            token: state.token,
-            isAuthenticated: state.isAuthenticated,
-          },
-        //   cart: state.cart,
+          // Only persist these fields
+          user: state.user,
+          token: state.token,
+          isAuthenticated: state.isAuthenticated,
         }),
       }
     )
   )
 );
+
+export default useStore;
