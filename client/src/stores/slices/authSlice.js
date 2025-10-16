@@ -1,7 +1,7 @@
 // ============================================
 // stores/slices/authSlice.js
 // ============================================
-import { createAuthActions } from '../actions/authAction';
+import { createAuthActions } from '../actions/authActions';
 
 // Initial state
 const initialState = {

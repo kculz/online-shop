@@ -1,5 +1,5 @@
 // ============================================
-// stores/selectors/authSelector.js
+// stores/selectors/authSelectors.js
 // ============================================
 export const authSelectors = {
   // Select user
@@ -28,4 +28,7 @@ export const authSelectors = {
   
   // Get username
   username: (state) => state.user?.username,
+  
+  // Get user ID
+  userId: (state) => state.user?.id,
 };

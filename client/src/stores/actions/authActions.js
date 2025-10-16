@@ -1,5 +1,5 @@
 // ============================================
-// stores/actions/authAction.js
+// stores/actions/authActions.js
 // ============================================
 import { authAPI } from '../../services/api';
 
@@ -25,7 +25,7 @@ export const createAuthActions = (set, get) => ({
       
       return { success: true, user };
     } catch (error) {
-      const errorMessage = error.response?.data?.msg || 'Invalid credentials';
+      const errorMessage = error.response?.data?.error || 'Invalid credentials';
       set({
         isLoading: false,
         error: errorMessage,
@@ -58,7 +58,7 @@ export const createAuthActions = (set, get) => ({
       
       return { success: true, user };
     } catch (error) {
-      const errorMessage = error.response?.data?.msg || 'Registration failed';
+      const errorMessage = error.response?.data?.error || 'Registration failed';
       set({
         isLoading: false,
         error: errorMessage,
