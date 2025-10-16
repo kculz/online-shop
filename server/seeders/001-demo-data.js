@@ -1,12 +1,12 @@
 // seeders/001-demo-data.js
 'use strict';
 
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 
 module.exports = {
   up: async (queryInterface, Sequelize) => {
-    // Create Users
-    const users = await queryInterface.bulkInsert('Users', [
+    // Create Users first
+    await queryInterface.bulkInsert('Users', [
       {
         username: 'admin',
         password: await bcrypt.hash('admin123', 10),
@@ -31,10 +31,16 @@ module.exports = {
         createdAt: new Date(),
         updatedAt: new Date()
       }
-    ], { returning: true });
+    ]);
+
+    // Get the inserted user IDs manually
+    const users = await queryInterface.sequelize.query(
+      'SELECT id FROM Users ORDER BY id ASC;',
+      { type: queryInterface.sequelize.QueryTypes.SELECT }
+    );
 
     // Create Categories
-    const categories = await queryInterface.bulkInsert('Categories', [
+    await queryInterface.bulkInsert('Categories', [
       {
         name: 'Electronics',
         description: 'Electronic devices and accessories',
@@ -53,10 +59,16 @@ module.exports = {
         createdAt: new Date(),
         updatedAt: new Date()
       }
-    ], { returning: true });
+    ]);
+
+    // Get the inserted category IDs manually
+    const categories = await queryInterface.sequelize.query(
+      'SELECT id FROM Categories ORDER BY id ASC;',
+      { type: queryInterface.sequelize.QueryTypes.SELECT }
+    );
 
     // Create Products
-    const products = await queryInterface.bulkInsert('Products', [
+    await queryInterface.bulkInsert('Products', [
       {
         name: 'iPhone 14 Pro',
         description: 'Latest Apple smartphone with advanced camera',
@@ -117,21 +129,33 @@ module.exports = {
         createdAt: new Date(),
         updatedAt: new Date()
       }
-    ], { returning: true });
+    ]);
+
+    // Get the inserted product IDs manually
+    const products = await queryInterface.sequelize.query(
+      'SELECT id FROM Products ORDER BY id ASC;',
+      { type: queryInterface.sequelize.QueryTypes.SELECT }
+    );
 
     // Create Carts
-    const carts = await queryInterface.bulkInsert('Carts', [
+    await queryInterface.bulkInsert('Carts', [
       {
-        userId: users[1].id,
+        userId: users[1].id, // john_doe
         createdAt: new Date(),
         updatedAt: new Date()
       },
       {
-        userId: users[2].id,
+        userId: users[2].id, // jane_smith
         createdAt: new Date(),
         updatedAt: new Date()
       }
-    ], { returning: true });
+    ]);
+
+    // Get the inserted cart IDs manually
+    const carts = await queryInterface.sequelize.query(
+      'SELECT id FROM Carts ORDER BY id ASC;',
+      { type: queryInterface.sequelize.QueryTypes.SELECT }
+    );
 
     // Create Cart Items
     await queryInterface.bulkInsert('CartItems', [
@@ -167,9 +191,9 @@ module.exports = {
     ]);
 
     // Create Orders
-    const orders = await queryInterface.bulkInsert('Orders', [
+    await queryInterface.bulkInsert('Orders', [
       {
-        userId: users[1].id,
+        userId: users[1].id, // john_doe
         totalAmount: 1049.98,
         status: 'delivered',
         shippingAddress: '123 Main St, Harare, Zimbabwe',
@@ -178,7 +202,7 @@ module.exports = {
         updatedAt: new Date()
       },
       {
-        userId: users[2].id,
+        userId: users[2].id, // jane_smith
         totalAmount: 349.93,
         status: 'processing',
         shippingAddress: '456 Park Ave, Bulawayo, Zimbabwe',
@@ -186,10 +210,16 @@ module.exports = {
         createdAt: new Date(),
         updatedAt: new Date()
       }
-    ], { returning: true });
+    ]);
+
+    // Get the inserted order IDs manually
+    const orders = await queryInterface.sequelize.query(
+      'SELECT id FROM Orders ORDER BY id ASC;',
+      { type: queryInterface.sequelize.QueryTypes.SELECT }
+    );
 
     // Create Order Items
-    const orderItems = await queryInterface.bulkInsert('OrderItems', [
+    await queryInterface.bulkInsert('OrderItems', [
       {
         orderId: orders[0].id,
         productId: products[0].id,
@@ -223,7 +253,13 @@ module.exports = {
         createdAt: new Date(),
         updatedAt: new Date()
       }
-    ], { returning: true });
+    ]);
+
+    // Get the inserted order item IDs manually
+    const orderItems = await queryInterface.sequelize.query(
+      'SELECT id FROM OrderItems ORDER BY id ASC;',
+      { type: queryInterface.sequelize.QueryTypes.SELECT }
+    );
 
     // Create Payments
     await queryInterface.bulkInsert('Payments', [
@@ -252,7 +288,7 @@ module.exports = {
     // Create Rentals
     await queryInterface.bulkInsert('Rentals', [
       {
-        orderItemId: orderItems[1].id,
+        orderItemId: orderItems[1].id, // Second order item (Power Drill rental)
         startDate: new Date('2024-01-01'),
         endDate: new Date('2024-01-06'),
         actualReturnDate: new Date('2024-01-06'),
@@ -264,7 +300,7 @@ module.exports = {
         updatedAt: new Date()
       },
       {
-        orderItemId: orderItems[2].id,
+        orderItemId: orderItems[2].id, // Third order item (MacBook rental)
         startDate: new Date('2024-01-15'),
         endDate: new Date('2024-01-22'),
         depositAmount: 500.00,
