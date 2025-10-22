@@ -1,53 +1,125 @@
-// ============================================
-// pages/Login.jsx - PROPERLY FIXED
-// ============================================
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { useDispatch, useSelector } from 'react-redux';
 import { 
-  FaEnvelope,
-  FaLock,
-  FaUser,
-  FaEye,
-  FaEyeSlash,
-  FaShieldAlt,
-  FaArrowLeft
+  FaUser, FaLock, FaEye, FaEyeSlash,
+  FaShieldAlt, FaArrowLeft
 } from 'react-icons/fa';
-import { useAuth } from '../stores';
+import { signinThunk } from '../features/auth/authThunks';
+import { clearError } from '../features/auth/authSlice';
 
 const Login = () => {
   const navigate = useNavigate();
-  
-  // ✅ CORRECT: Destructure only what you need
-  const { signin, isLoading, error, clearError } = useAuth();
-  
+  const location = useLocation();
+  const dispatch = useDispatch();
+
+  // ✅ Get all auth state from Redux store
+  const { isLoading, error, isAuthenticated, user } = useSelector((state) => state.auth);
+
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
     username: '',
     password: '',
   });
   const [rememberMe, setRememberMe] = useState(false);
+  const [localErrors, setLocalErrors] = useState({});
+
+  // Get redirect path from location state or session storage
+  const from = location.state?.from?.pathname || sessionStorage.getItem('redirectAfterLogin') || '/';
+
+  // Redirect authenticated users
+  useEffect(() => {
+    if (isAuthenticated) {
+      // Store user preference if remember me is checked
+      if (rememberMe && user) {
+        localStorage.setItem('rememberedUser', JSON.stringify({
+          username: user.username,
+          timestamp: Date.now()
+        }));
+      }
+
+      // Clear redirect path and navigate
+      sessionStorage.removeItem('redirectAfterLogin');
+      navigate(from, { replace: true });
+    }
+  }, [isAuthenticated, navigate, from, rememberMe, user]);
+
+  // Pre-fill username if remembered
+  useEffect(() => {
+    const rememberedUser = localStorage.getItem('rememberedUser');
+    if (rememberedUser) {
+      try {
+        const userData = JSON.parse(rememberedUser);
+        // Check if remembered within last 30 days
+        if (Date.now() - userData.timestamp < 30 * 24 * 60 * 60 * 1000) {
+          setFormData(prev => ({ ...prev, username: userData.username }));
+          setRememberMe(true);
+        } else {
+          localStorage.removeItem('rememberedUser');
+        }
+      } catch (error) {
+        localStorage.removeItem('rememberedUser');
+      }
+    }
+  }, []);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
-    if (error) clearError();
+    
+    // Clear local errors when user types
+    if (localErrors[name]) {
+      setLocalErrors(prev => ({ ...prev, [name]: '' }));
+    }
+    
+    // Clear Redux error if exists
+    if (error) {
+      dispatch(clearError());
+    }
+  };
+
+  const validateForm = () => {
+    const errors = {};
+    
+    if (!formData.username.trim()) {
+      errors.username = 'Username is required';
+    }
+    
+    if (!formData.password) {
+      errors.password = 'Password is required';
+    }
+    
+    setLocalErrors(errors);
+    return Object.keys(errors).length === 0;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (!formData.username || !formData.password) {
+    // Clear previous errors
+    dispatch(clearError());
+    setLocalErrors({});
+    
+    // Validate form
+    if (!validateForm()) {
       return;
     }
 
-    const result = await signin({
-      username: formData.username,
-      password: formData.password,
-    });
+    try {
+      // ✅ Dispatch the signinThunk with actual user input
+      await dispatch(signinThunk({
+        username: formData.username.trim(),
+        password: formData.password,
+      })).unwrap();
 
-    if (result.success) {
-      // Navigate to home or dashboard
-      navigate('/');
+      // Success handling is done in the useEffect above
+      
+    } catch (err) {
+      // Error is already handled in the Redux state
+      console.error('Login failed:', err);
+      
+      // Clear password on error for security
+      setFormData(prev => ({ ...prev, password: '' }));
     }
   };
 
@@ -64,6 +136,7 @@ const Login = () => {
         <button 
           onClick={() => navigate('/')}
           className="mb-6 flex items-center gap-2 text-white hover:text-gray-200 transition-colors"
+          disabled={isLoading}
         >
           <FaArrowLeft />
           <span className="font-medium">Back to Home</span>
@@ -82,9 +155,13 @@ const Login = () => {
 
           {/* Form */}
           <div className="p-8">
-            {error && (
+            {/* Error Display */}
+            {(error || Object.keys(localErrors).length > 0) && (
               <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-                <p className="text-sm text-red-600">{error}</p>
+                {error && <p className="text-sm text-red-600 mb-2">{error}</p>}
+                {Object.values(localErrors).map((errorMsg, index) => (
+                  <p key={index} className="text-sm text-red-600">• {errorMsg}</p>
+                ))}
               </div>
             )}
 
@@ -104,12 +181,18 @@ const Login = () => {
                     name="username"
                     value={formData.username}
                     onChange={handleInputChange}
-                    className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    className={`w-full pl-12 pr-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${
+                      localErrors.username ? 'border-red-300' : 'border-gray-300'
+                    }`}
                     placeholder="Enter your username"
                     disabled={isLoading}
                     required
+                    autoComplete="username"
                   />
                 </div>
+                {localErrors.username && (
+                  <p className="mt-1 text-sm text-red-600">{localErrors.username}</p>
+                )}
               </div>
 
               {/* Password Input */}
@@ -127,19 +210,26 @@ const Login = () => {
                     name="password"
                     value={formData.password}
                     onChange={handleInputChange}
-                    className="w-full pl-12 pr-12 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    className={`w-full pl-12 pr-12 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${
+                      localErrors.password ? 'border-red-300' : 'border-gray-300'
+                    }`}
                     placeholder="Enter your password"
                     disabled={isLoading}
                     required
+                    autoComplete="current-password"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-gray-600"
+                    disabled={isLoading}
                   >
                     {showPassword ? <FaEyeSlash /> : <FaEye />}
                   </button>
                 </div>
+                {localErrors.password && (
+                  <p className="mt-1 text-sm text-red-600">{localErrors.password}</p>
+                )}
               </div>
 
               {/* Remember Me & Forgot Password */}
@@ -150,12 +240,14 @@ const Login = () => {
                     checked={rememberMe}
                     onChange={(e) => setRememberMe(e.target.checked)}
                     className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
+                    disabled={isLoading}
                   />
                   <span className="ml-2 text-sm text-gray-600">Remember me</span>
                 </label>
                 <button 
                   type="button"
                   className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                  disabled={isLoading}
                 >
                   Forgot password?
                 </button>
@@ -167,7 +259,14 @@ const Login = () => {
                 disabled={isLoading}
                 className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 rounded-lg font-semibold hover:from-blue-700 hover:to-purple-700 transform hover:scale-[1.02] transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isLoading ? 'Signing in...' : 'Sign In'}
+                {isLoading ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <div className="w-4 h-4 border-2 border-t-white border-white border-opacity-30 rounded-full animate-spin"></div>
+                    Signing in...
+                  </span>
+                ) : (
+                  'Sign In'
+                )}
               </button>
             </form>
 
@@ -178,6 +277,7 @@ const Login = () => {
                 <button 
                   onClick={() => navigate('/register')}
                   className="text-blue-600 hover:text-blue-700 font-semibold"
+                  disabled={isLoading}
                 >
                   Sign up for free
                 </button>

@@ -2,12 +2,13 @@
 // components/auth/ProtectedRoute.jsx - FIXED VERSION
 // ============================================
 import { Navigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../../stores';
+import { useSelector } from 'react-redux';
+import { selectIsAuthenticated, selectIsLoading } from '../../features/auth/authSelectors'; // ✅ FIXED IMPORT
 
 const ProtectedRoute = ({ children }) => {
   const location = useLocation();
-  const isAuthenticated = useAuth(state => state.isAuthenticated);
-  const isLoading = useAuth(state => state.isLoading);
+  const isAuthenticated = useSelector(selectIsAuthenticated);
+  const isLoading = useSelector(selectIsLoading); // ✅ FIXED: selectIsLoading instead of selectAuthLoading
 
   // Show loading state while checking authentication
   if (isLoading) {

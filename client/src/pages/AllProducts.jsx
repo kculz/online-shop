@@ -1,8 +1,9 @@
 // ============================================
-// pages/AllProducts.jsx - API INTEGRATION VERSION
+// pages/AllProducts.jsx - REDUX VERSION
 // ============================================
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useDispatch, useSelector } from 'react-redux';
 import { 
   FaStar,
   FaShoppingCart,
@@ -18,28 +19,43 @@ import {
   FaExclamationTriangle,
   FaSpinner
 } from 'react-icons/fa';
-import { useAuth, useCart, useProducts, useCategories } from '../stores';
-import { productSelectors, cartSelectors, categorySelectors } from '../stores/selectors';
+
+// Import Redux actions and selectors
+import { fetchProductsThunk } from '../features/products/productsThunks';
+import { fetchCategoriesThunk } from '../features/categories/categoriesThunks';
+import { addToCartThunk } from '../features/cart/cartThunks';
+import { 
+  selectIsAuthenticated 
+} from '../features/auth/authSelectors';
+import { 
+  selectAllProducts,
+  selectProductsLoading,
+  selectProductsError,
+  selectAvailableProducts,
+  selectFeaturedProducts
+} from '../features/products/productsSelectors';
+import { 
+  selectAllCategories,
+  selectCategoriesWithProductCount
+} from '../features/categories/categoriesSelectors';
+import { 
+  selectCartItems 
+} from '../features/cart/cartSelectors';
 
 const AllProducts = () => {
   const navigate = useNavigate();
-  const { isAuthenticated } = useAuth();
+  const dispatch = useDispatch();
   
-  // Cart store
-  const { addToCart } = useCart();
-  const cartState = useCart();
-  const cartItems = cartSelectors.cartItems(cartState);
-  
-  // Products store
-  const { products, fetchProducts, isLoading: productsLoading, error: productsError } = useProducts();
-  const productsState = useProducts();
-  const availableProducts = productSelectors.availableProducts(productsState);
-  const featuredProducts = productSelectors.featuredProducts(productsState);
-  
-  // Categories store
-  const { categories, fetchCategories, isLoading: categoriesLoading } = useCategories();
-  const categoriesState = useCategories();
-  const categoriesWithCounts = categorySelectors.categoriesWithCounts(categoriesState);
+  // Redux Selectors
+  const isAuthenticated = useSelector(selectIsAuthenticated);
+  const products = useSelector(selectAllProducts);
+  const availableProducts = useSelector(selectAvailableProducts);
+  const featuredProducts = useSelector(selectFeaturedProducts);
+  const isLoading = useSelector(selectProductsLoading);
+  const error = useSelector(selectProductsError);
+  const categories = useSelector(selectAllCategories);
+  const categoriesWithCounts = useSelector(selectCategoriesWithProductCount);
+  const cartItems = useSelector(selectCartItems);
 
   // Local state
   const [viewMode, setViewMode] = useState('grid');
@@ -56,9 +72,9 @@ const AllProducts = () => {
 
   // Fetch data on component mount
   useEffect(() => {
-    fetchProducts();
-    fetchCategories();
-  }, [fetchProducts, fetchCategories]);
+    dispatch(fetchProductsThunk());
+    dispatch(fetchCategoriesThunk());
+  }, [dispatch]);
 
   // Safe price formatting function
   const formatPrice = (price) => {
@@ -111,14 +127,14 @@ const AllProducts = () => {
     setAddingToCart(prev => ({ ...prev, [product.id]: true }));
 
     try {
-      await addToCart({
+      await dispatch(addToCartThunk({
         productId: product.id,
         quantity: 1,
         isForRental: false,
         priceAtAddition: product.price,
         productName: product.name,
         productImage: product.image || '📦'
-      });
+      })).unwrap();
     } catch (error) {
       console.error('Failed to add to cart:', error);
     } finally {
@@ -226,15 +242,15 @@ const AllProducts = () => {
     ...(categoriesWithCounts || [])
   ];
 
-  if (productsError) {
+  if (error) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <FaExclamationTriangle className="text-red-500 text-6xl mx-auto mb-4" />
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Error Loading Products</h2>
-          <p className="text-gray-600 mb-4">{productsError}</p>
+          <p className="text-gray-600 mb-4">{error}</p>
           <button
-            onClick={fetchProducts}
+            onClick={() => dispatch(fetchProductsThunk())}
             className="bg-blue-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
           >
             Try Again
@@ -437,7 +453,7 @@ const AllProducts = () => {
             </div>
 
             {/* Loading State */}
-            {productsLoading && (
+            {isLoading && (
               <div className="flex justify-center items-center py-12">
                 <div className="text-center">
                   <FaSpinner className="animate-spin text-4xl text-blue-600 mx-auto mb-4" />
@@ -447,7 +463,7 @@ const AllProducts = () => {
             )}
 
             {/* Products Grid/List */}
-            {!productsLoading && paginatedProducts.length === 0 && (
+            {!isLoading && paginatedProducts.length === 0 && (
               <div className="bg-white rounded-2xl shadow-sm p-12 text-center">
                 <div className="text-6xl mb-4">🔍</div>
                 <h3 className="text-xl font-semibold text-gray-900 mb-2">No products found</h3>
@@ -468,7 +484,7 @@ const AllProducts = () => {
               </div>
             )}
 
-            {!productsLoading && paginatedProducts.length > 0 && (
+            {!isLoading && paginatedProducts.length > 0 && (
               <>
                 <div className={viewMode === 'grid' 
                   ? 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6'

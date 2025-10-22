@@ -1,8 +1,9 @@
 // ============================================
-// pages/ProductDetail.jsx - API INTEGRATION VERSION
+// pages/ProductDetail.jsx - REDUX VERSION
 // ============================================
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useDispatch, useSelector } from 'react-redux';
 import {
   FaArrowLeft,
   FaShoppingCart,
@@ -19,27 +20,34 @@ import {
   FaCalendarAlt,
   FaExclamationTriangle
 } from 'react-icons/fa';
-import { useAuth, useCart, useProducts } from '../stores';
-import { productSelectors, cartSelectors } from '../stores/selectors';
+
+// Import Redux actions and selectors
+import { fetchProductByIdThunk } from '../features/products/productsThunks';
+import { addToCartThunk } from '../features/cart/cartThunks';
+import { 
+  selectIsAuthenticated 
+} from '../features/auth/authSelectors';
+import { 
+  selectCurrentProduct,
+  selectProductsLoading,
+  selectProductsError 
+} from '../features/products/productsSelectors';
+import { 
+  selectCartItems 
+} from '../features/cart/cartSelectors';
+import { clearCurrentProduct } from '../features/products/productsSlice';
 
 const ProductDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   
-  // Auth store
-  const { isAuthenticated } = useAuth();
-  
-  // Cart store
-  const { addToCart } = useCart();
-  const cartState = useCart();
-  const cartItems = cartSelectors.cartItems(cartState);
-  
-  // Products store
-  const { fetchProductById, clearCurrentProduct } = useProducts();
-  const productsState = useProducts();
-  const currentProduct = productSelectors.currentProduct(productsState);
-  const isLoading = productSelectors.isLoading(productsState);
-  const error = productSelectors.error(productsState);
+  // Redux Selectors
+  const isAuthenticated = useSelector(selectIsAuthenticated);
+  const currentProduct = useSelector(selectCurrentProduct);
+  const isLoading = useSelector(selectProductsLoading);
+  const error = useSelector(selectProductsError);
+  const cartItems = useSelector(selectCartItems);
   
   // Local state
   const [selectedImage, setSelectedImage] = useState(0);
@@ -52,14 +60,14 @@ const ProductDetail = () => {
   useEffect(() => {
     // Fetch product when component mounts or id changes
     if (id) {
-      fetchProductById(parseInt(id));
+      dispatch(fetchProductByIdThunk(parseInt(id)));
     }
 
     // Cleanup: clear current product when component unmounts
     return () => {
-      clearCurrentProduct();
+      dispatch(clearCurrentProduct());
     };
-  }, [id, fetchProductById, clearCurrentProduct]);
+  }, [id, dispatch]);
 
   // Safe price formatting function
   const formatPrice = (price) => {
@@ -100,7 +108,7 @@ const ProductDetail = () => {
     setAddingToCart(true);
 
     try {
-      await addToCart({
+      await dispatch(addToCartThunk({
         productId: currentProduct.id,
         quantity: quantity,
         isForRental: false,
@@ -108,7 +116,7 @@ const ProductDetail = () => {
         productName: currentProduct.name,
         productImage: currentProduct.image || '📦',
         rentalDays: currentProduct.canBeRented ? 7 : undefined
-      });
+      })).unwrap();
       
       // Success feedback could be shown here
       console.log('Added to cart:', currentProduct.name, 'Quantity:', quantity);
@@ -131,14 +139,14 @@ const ProductDetail = () => {
     setAddingToCart(true);
 
     try {
-      await addToCart({
+      await dispatch(addToCartThunk({
         productId: currentProduct.id,
         quantity: quantity,
         isForRental: false,
         priceAtAddition: currentProduct.price,
         productName: currentProduct.name,
         productImage: currentProduct.image || '📦'
-      });
+      })).unwrap();
       
       // Navigate directly to checkout
       navigate('/checkout');
@@ -219,7 +227,7 @@ const ProductDetail = () => {
           <p className="text-gray-600 mb-4">{error}</p>
           <div className="flex gap-4 justify-center">
             <button
-              onClick={() => fetchProductById(parseInt(id))}
+              onClick={() => dispatch(fetchProductByIdThunk(parseInt(id)))}
               className="bg-blue-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
             >
               Try Again

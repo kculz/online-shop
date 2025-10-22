@@ -1,8 +1,9 @@
 // ============================================
-// components/navigation/Header.jsx
+// components/navigation/Header.jsx - REDUX VERSION
 // ============================================
 import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { useDispatch, useSelector } from 'react-redux';
 import { 
   FaUser, 
   FaSignOutAlt, 
@@ -15,24 +16,40 @@ import {
   FaMicrochip,
   FaCalendarAlt
 } from 'react-icons/fa';
-import { useAuth, useCart } from '../../stores';
-import { cartSelectors } from '../../stores/selectors/cartSelectors';
+
+// Import Redux actions and selectors
+import { logoutThunk } from '../../features/auth/authThunks';
+import { 
+  selectIsAuthenticated, 
+  selectUser 
+} from '../../features/auth/authSelectors';
+import { 
+  selectCartItemCount 
+} from '../../features/cart/cartSelectors';
 
 const Header = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { isAuthenticated, user, logout } = useAuth();
-  const { cartItemCount } = useCart(cartSelectors.cartItemCount);
+  const dispatch = useDispatch();
+
+  // Redux Selectors
+  const isAuthenticated = useSelector(selectIsAuthenticated);
+  const user = useSelector(selectUser);
+  const cartItemCount = useSelector(selectCartItemCount);
   
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
 
   const handleLogout = async () => {
-    await logout();
-    setIsMobileMenuOpen(false);
-    setIsUserMenuOpen(false);
-    navigate('/');
+    try {
+      await dispatch(logoutThunk()).unwrap();
+      setIsMobileMenuOpen(false);
+      setIsUserMenuOpen(false);
+      navigate('/');
+    } catch (error) {
+      console.error('Logout failed:', error);
+    }
   };
 
   const toggleMobileMenu = () => {

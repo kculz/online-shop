@@ -2,37 +2,30 @@
 // components/auth/ProtectedRoute.jsx - FIXED VERSION
 // ============================================
 import { Navigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../../stores';
+import { useSelector } from 'react-redux';
+import { selectIsAuthenticated, selectIsLoading } from '../../features/auth/authSelectors'; // ✅ FIXED IMPORT
 
-const ProtectedRoute = ({ children, requireAdmin = false }) => {
-  // ✅ FIX: Get only what we need
-  const { isAuthenticated, user, isLoading } = useAuth();
+const ProtectedRoute = ({ children }) => {
   const location = useLocation();
+  const isAuthenticated = useSelector(selectIsAuthenticated);
+  const isLoading = useSelector(selectIsLoading); // ✅ FIXED: selectIsLoading instead of selectAuthLoading
 
-  // ✅ Show loading spinner while checking authentication
+  // Show loading state while checking authentication
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-      </div>
-    );
-  }
-
-  // ✅ Redirect to login if not authenticated
-  if (!isAuthenticated) {
-    return <Navigate to="/login" state={{ from: location }} replace />;
-  }
-
-  // ✅ Check admin role if required
-  if (requireAdmin && user?.role !== 'admin') {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900 mb-4">Access Denied</h1>
-          <p className="text-gray-600">You don't have permission to access this page.</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Checking authentication...</p>
         </div>
       </div>
     );
+  }
+
+  if (!isAuthenticated) {
+    // ✅ FIX: Save current location before redirecting
+    sessionStorage.setItem('redirectAfterLogin', location.pathname + location.search);
+    return <Navigate to="/login" state={{ from: location.pathname }} replace />;
   }
 
   return children;

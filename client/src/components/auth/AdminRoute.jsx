@@ -1,15 +1,15 @@
-// 3. Fix AdminRoute Component
 // ============================================
 // File: client/src/components/auth/AdminRoute.jsx
 // ============================================
 import { Navigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../../stores';
+import { useSelector } from 'react-redux';
+import { selectIsAuthenticated, selectIsLoading } from '../../features/auth/authSelectors'; // ✅ FIXED IMPORT
 
 const AdminRoute = ({ children }) => {
   const location = useLocation();
-  const isAuthenticated = useAuth(state => state.isAuthenticated);
-  const user = useAuth(state => state.user);
-  const isLoading = useAuth(state => state.isLoading);
+  const isAuthenticated = useSelector(selectIsAuthenticated);
+  const user = useSelector(selectUser);
+  const isLoading = useSelector(selectIsLoading);
 
   // Show loading state while checking authentication
   if (isLoading) {

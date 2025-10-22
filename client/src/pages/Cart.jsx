@@ -1,28 +1,40 @@
 // ============================================
-// pages/Cart.jsx - PROPERLY FIXED VERSION
+// pages/Cart.jsx - REDUX VERSION
 // ============================================
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useDispatch, useSelector } from 'react-redux';
 import { 
   FaShoppingCart, FaTrash, FaPlus, FaMinus, FaArrowLeft,
   FaArrowRight, FaHeart, FaTag, FaTruck, FaShieldAlt
 } from 'react-icons/fa';
-import { useAuth, useCart } from '../stores';
+
+// Import Redux actions and selectors
+import { 
+  fetchCartThunk, 
+  updateCartItemThunk, 
+  removeFromCartThunk 
+} from '../features/cart/cartThunks';
+import { 
+  selectIsAuthenticated 
+} from '../features/auth/authSelectors';
+import { 
+  selectCartItems,
+  selectCartLoading,
+  selectCartError,
+  selectCartItemCount
+} from '../features/cart/cartSelectors';
 
 const Cart = () => {
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   
-  // ✅ CORRECT: Select only what you need
-  const { isAuthenticated } = useAuth();
-  const { 
-    cart, 
-    isLoading,
-    error,
-    fetchCart, 
-    updateCartItem, 
-    removeFromCart,
-    clearError 
-  } = useCart();
+  // Redux Selectors
+  const isAuthenticated = useSelector(selectIsAuthenticated);
+  const cartItems = useSelector(selectCartItems);
+  const isLoading = useSelector(selectCartLoading);
+  const error = useSelector(selectCartError);
+  const cartItemCount = useSelector(selectCartItemCount);
   
   // Local state
   const [couponCode, setCouponCode] = useState('');
@@ -37,7 +49,7 @@ const Cart = () => {
     const loadCart = async () => {
       if (isAuthenticated && isInitialLoad) {
         try {
-          await fetchCart();
+          await dispatch(fetchCartThunk()).unwrap();
         } catch (error) {
           console.error('Failed to fetch cart:', error);
         } finally {
@@ -55,7 +67,7 @@ const Cart = () => {
     return () => {
       isMounted = false;
     };
-  }, [isAuthenticated, fetchCart, isInitialLoad]);
+  }, [isAuthenticated, dispatch, isInitialLoad]);
 
   // Safe utility functions
   const formatPrice = useCallback((price) => {
@@ -70,26 +82,26 @@ const Cart = () => {
     return isNaN(numValue) ? 0 : numValue;
   }, []);
 
-  // Get cart items safely
-  const cartItems = useMemo(() => cart?.items || [], [cart]);
-
   // Action handlers
   const handleUpdateQuantity = useCallback(async (itemId, newQuantity) => {
     if (newQuantity < 1) return;
     try {
-      await updateCartItem(itemId, { quantity: newQuantity });
+      await dispatch(updateCartItemThunk({ 
+        itemId, 
+        updateData: { quantity: newQuantity } 
+      })).unwrap();
     } catch (error) {
       console.error('Failed to update quantity:', error);
     }
-  }, [updateCartItem]);
+  }, [dispatch]);
 
   const handleRemoveItem = useCallback(async (itemId) => {
     try {
-      await removeFromCart(itemId);
+      await dispatch(removeFromCartThunk(itemId)).unwrap();
     } catch (error) {
       console.error('Failed to remove item:', error);
     }
-  }, [removeFromCart]);
+  }, [dispatch]);
 
   const handleSaveForLater = useCallback((item) => {
     setSavedItems(prev => [...prev, item]);

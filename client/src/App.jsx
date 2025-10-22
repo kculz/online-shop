@@ -1,15 +1,17 @@
 // ============================================
-// App.jsx - PROPERLY FIXED VERSION
+// App.jsx - UPDATED REDUX VERSION
 // ============================================
 import { Route, Routes } from "react-router-dom";
 import { useEffect, useRef } from "react";
-import { useAuth } from "./stores";
+import { useDispatch, useSelector } from "react-redux";
+import { checkAuthThunk } from "./features/auth/authThunks";
+import { selectIsLoading } from "./features/auth/authSelectors";
 
 // Layouts
 import UserLayout from "./components/layouts/UserLayout";
 import DashboardLayout from "./components/layouts/DashboardLayout";
 
-// Auth Components
+// Auth Components (already updated to use Redux)
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import AdminRoute from "./components/auth/AdminRoute";
 import PublicRoute from "./components/auth/PublicRoute";
@@ -17,40 +19,52 @@ import PublicRoute from "./components/auth/PublicRoute";
 // Public Pages
 import HomePage from "./pages/HomePage";
 import Login from "./pages/Login";
-import Register from "./pages/Register";
+// import Register from "./pages/Register";
 import AllProducts from "./pages/AllProducts";
 import RentalProducts from "./pages/RentalProducts";
 import ProductDetail from "./pages/ProductDetail";
 
 // Protected Pages (User)
 import Cart from "./pages/Cart";
-import Checkout from "./pages/Checkout";
-import Profile from "./pages/Profile";
+// import Checkout from "./pages/Checkout";
+// import Profile from "./pages/Profile";
 
 // Admin Pages
-import Dashboard from "./pages/admin/Dashboard";
-import Products from "./pages/admin/Products";
-import Categories from "./pages/admin/Categories";
-import Orders from "./pages/admin/Orders";
-import Rentals from "./pages/admin/Rentals";
-import Users from "./pages/admin/Users";
-import Payments from "./pages/admin/Payments";
+// import Dashboard from "./pages/admin/Dashboard";
+// import Products from "./pages/admin/Products";
+// import Categories from "./pages/admin/Categories";
+// import Orders from "./pages/admin/Orders";
+// import Rentals from "./pages/admin/Rentals";
+// import Users from "./pages/admin/Users";
+// import Payments from "./pages/admin/Payments";
 
 function App() {
-  // ✅ CORRECT: Call useAuth() without parameters to get the whole object
-  const { checkAuth } = useAuth();
+  const dispatch = useDispatch();
+  const isLoading = useSelector(selectIsLoading);
   
   // ✅ Use ref to ensure checkAuth only runs once
   const hasCheckedAuth = useRef(false);
 
   useEffect(() => {
-    // ✅ Only check auth once on mount
+    // ✅ Only check auth once on mount using the correct Redux thunk
     if (!hasCheckedAuth.current) {
       console.log('🔍 App mounted - checking authentication...');
-      checkAuth();
+      dispatch(checkAuthThunk()); // ✅ FIXED: Using checkAuthThunk instead of verifyTokenThunk
       hasCheckedAuth.current = true;
     }
-  }, []); // ✅ Empty deps - checkAuth is stable and won't change
+  }, [dispatch]); // ✅ Add dispatch to dependencies
+
+  // Show loading state while checking initial authentication
+  if (isLoading && !hasCheckedAuth.current) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading application...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <Routes>
@@ -86,11 +100,11 @@ function App() {
         </PublicRoute>
       } />
       
-      <Route path="/register" element={
+      {/* <Route path="/register" element={
         <PublicRoute>
           <Register />
         </PublicRoute>
-      } />
+      } /> */}
 
       {/* PROTECTED USER ROUTES - Require authentication */}
       <Route path="/cart" element={
@@ -101,7 +115,7 @@ function App() {
         </ProtectedRoute>
       } />
       
-      <Route path="/checkout" element={
+      {/* <Route path="/checkout" element={
         <ProtectedRoute>
           <UserLayout>
             <Checkout />
@@ -115,9 +129,9 @@ function App() {
             <Profile />
           </UserLayout>
         </ProtectedRoute>
-      } />
+      } /> */}
 
-      {/* ADMIN ROUTES - Require admin role */}
+      {/* ADMIN ROUTES - Require admin role
       <Route path="/admin" element={
         <AdminRoute>
           <DashboardLayout>
@@ -172,7 +186,7 @@ function App() {
             <Payments />
           </DashboardLayout>
         </AdminRoute>
-      } />
+      } /> */}
 
       {/* 404 Route */}
       <Route path="*" element={

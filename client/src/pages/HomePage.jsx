@@ -1,35 +1,52 @@
 // ============================================
-// pages/HomePage.jsx - BACKEND INTEGRATED VERSION
+// HomePage with Redux Integration
 // ============================================
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useDispatch, useSelector } from 'react-redux';
 import { 
   FaLaptop, FaStar, FaShoppingCart, FaHeart, FaArrowRight,
   FaTruck, FaShieldAlt, FaPhoneAlt, FaTools, FaFire,
   FaCalendarAlt, FaCheck, FaChevronLeft, FaChevronRight
 } from 'react-icons/fa';
-import { useAuth, useCart, useProducts, useCategories } from '../stores';
+
+// Import Redux actions and selectors
+import { 
+  fetchProductsThunk, 
+  fetchRentalProductsThunk 
+} from '../features/products/productsThunks';
+import { fetchCategoriesThunk } from '../features/categories/categoriesThunks';
+import { addToCartThunk } from '../features/cart/cartThunks';
+
+import { 
+  selectAllProducts,
+  selectRentalProducts,
+  selectProductsLoading 
+} from '../features/products/productsSelectors';
+import { 
+  selectAllCategories 
+} from '../features/categories/categoriesSelectors';
+import { 
+  selectCartItems,
+  selectCartLoading 
+} from '../features/cart/cartSelectors';
+import { 
+  selectIsAuthenticated 
+} from '../features/auth/authSelectors';
 
 const HomePage = () => {
   const navigate = useNavigate();
-  const { isAuthenticated } = useAuth();
-  
-  // Get store data and actions
-  const { 
-    products, 
-    rentalProducts, 
-    fetchProducts, 
-    fetchRentalProducts, 
-    isLoading: productsLoading 
-  } = useProducts();
-  
-  const { categories, fetchCategories } = useCategories();
-  
-  const { 
-    cart,
-    addToCart 
-  } = useCart();
-  
+  const dispatch = useDispatch();
+
+  // Redux Selectors
+  const isAuthenticated = useSelector(selectIsAuthenticated);
+  const products = useSelector(selectAllProducts);
+  const rentalProducts = useSelector(selectRentalProducts);
+  const categories = useSelector(selectAllCategories);
+  const cartItems = useSelector(selectCartItems);
+  const productsLoading = useSelector(selectProductsLoading);
+  const cartLoading = useSelector(selectCartLoading);
+
   const [currentHeroSlide, setCurrentHeroSlide] = useState(0);
   const [addingToCart, setAddingToCart] = useState({});
   const [wishlistItems, setWishlistItems] = useState(new Set());
@@ -105,10 +122,10 @@ const HomePage = () => {
 
   // Fetch data on mount
   useEffect(() => {
-    fetchProducts();
-    fetchRentalProducts();
-    fetchCategories();
-  }, [fetchProducts, fetchRentalProducts, fetchCategories]);
+    dispatch(fetchProductsThunk());
+    dispatch(fetchRentalProductsThunk());
+    dispatch(fetchCategoriesThunk());
+  }, [dispatch]);
 
   // Navigation handlers
   const nextHeroSlide = useCallback(() => {
@@ -140,10 +157,10 @@ const HomePage = () => {
 
   // Check if product is in cart
   const isProductInCart = useCallback((productId, isForRental = false) => {
-    return cart?.items?.some(item => 
+    return cartItems.some(item => 
       item.productId === productId && item.isForRental === isForRental
-    ) || false;
-  }, [cart]);
+    );
+  }, [cartItems]);
 
   // Check if product is in wishlist
   const isProductInWishlist = useCallback((productId) => {
@@ -168,20 +185,20 @@ const HomePage = () => {
     setAddingToCart(prev => ({ ...prev, [product.id]: true }));
 
     try {
-      await addToCart({
+      await dispatch(addToCartThunk({
         productId: product.id,
         quantity: 1,
         isForRental: false,
         priceAtAddition: product.price,
         productName: product.name,
         productImage: product.image || '📦'
-      });
+      })).unwrap();
     } catch (error) {
       console.error('Failed to add to cart:', error);
     } finally {
       setAddingToCart(prev => ({ ...prev, [product.id]: false }));
     }
-  }, [isAuthenticated, isProductInCart, addToCart, navigate]);
+  }, [isAuthenticated, isProductInCart, dispatch, navigate]);
 
   // Handle wishlist toggle
   const handleAddToWishlist = useCallback((productId, event) => {
@@ -263,6 +280,9 @@ const HomePage = () => {
         inWishlist: isProductInWishlist(product.id)
       }));
   }, [rentalProducts, formatPrice, getRating, getReviewsCount, isProductInCart, isProductInWishlist]);
+
+  // Check if still loading
+  const isLoading = productsLoading || cartLoading;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -372,7 +392,7 @@ const HomePage = () => {
             </p>
           </div>
           
-          {productsLoading ? (
+          {isLoading ? (
             <div className="flex justify-center items-center py-12">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
             </div>
@@ -381,14 +401,14 @@ const HomePage = () => {
               {(categories || []).slice(0, 8).map((category) => (
                 <Link 
                   key={category.id}
-                  to={`/products?category=${category.name.toLowerCase().replace(/\s+/g, '-')}`}
+                  to={`/products?category=${category.name?.toLowerCase().replace(/\s+/g, '-') || 'all'}`}
                   className="group cursor-pointer"
                 >
                   <div className="bg-gray-50 rounded-2xl p-8 text-center hover:shadow-lg transition-all duration-300 group-hover:-translate-y-1">
                     <div className="bg-blue-500 w-16 h-16 rounded-full flex items-center justify-center text-white text-2xl mx-auto mb-4">
                       <FaLaptop />
                     </div>
-                    <h3 className="font-semibold text-gray-900 mb-2">{category.name}</h3>
+                    <h3 className="font-semibold text-gray-900 mb-2">{category.name || 'Category'}</h3>
                     <p className="text-gray-500 text-sm">{category.productCount || '0'}+ products</p>
                   </div>
                 </Link>
@@ -427,7 +447,7 @@ const HomePage = () => {
           </div>
 
           {/* Rental Products Grid */}
-          {productsLoading ? (
+          {isLoading ? (
             <div className="flex justify-center items-center py-12">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div>
             </div>
@@ -542,7 +562,7 @@ const HomePage = () => {
             </p>
           </div>
 
-          {productsLoading ? (
+          {isLoading ? (
             <div className="flex justify-center items-center py-12">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-600"></div>
             </div>

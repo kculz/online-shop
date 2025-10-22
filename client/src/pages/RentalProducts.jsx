@@ -1,8 +1,9 @@
 // ============================================
-// pages/RentalProducts.jsx - API INTEGRATION VERSION
+// pages/RentalProducts.jsx - REDUX VERSION
 // ============================================
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useDispatch, useSelector } from 'react-redux';
 import {
   FaCalendarAlt,
   FaShoppingCart,
@@ -18,23 +19,34 @@ import {
   FaSpinner,
   FaExclamationTriangle
 } from 'react-icons/fa';
-import { useAuth, useCart, useProducts } from '../stores';
-import { productSelectors, cartSelectors } from '../stores/selectors';
+
+// Import Redux actions and selectors
+import { fetchRentalProductsThunk } from '../features/products/productsThunks';
+import { addToCartThunk } from '../features/cart/cartThunks';
+import { 
+  selectIsAuthenticated 
+} from '../features/auth/authSelectors';
+import { 
+  selectRentalProducts,
+  selectProductsLoading,
+  selectProductsError,
+  selectAvailableRentalProducts
+} from '../features/products/productsSelectors';
+import { 
+  selectCartItems 
+} from '../features/cart/cartSelectors';
 
 const RentalProducts = () => {
   const navigate = useNavigate();
-  const { isAuthenticated } = useAuth();
+  const dispatch = useDispatch();
   
-  // Cart store
-  const { addToCart } = useCart();
-  const cartState = useCart();
-  const cartItems = cartSelectors.cartItems(cartState);
-  
-  // Products store
-  const { fetchRentalProducts, isLoading: productsLoading, error: productsError } = useProducts();
-  const productsState = useProducts();
-  const rentalProducts = productSelectors.rentalProducts(productsState);
-  const availableRentalProducts = productSelectors.availableRentalProducts(productsState);
+  // Redux Selectors
+  const isAuthenticated = useSelector(selectIsAuthenticated);
+  const rentalProducts = useSelector(selectRentalProducts);
+  const availableRentalProducts = useSelector(selectAvailableRentalProducts);
+  const isLoading = useSelector(selectProductsLoading);
+  const error = useSelector(selectProductsError);
+  const cartItems = useSelector(selectCartItems);
 
   // Local state
   const [selectedDuration, setSelectedDuration] = useState({});
@@ -44,8 +56,8 @@ const RentalProducts = () => {
 
   // Fetch rental products on component mount
   useEffect(() => {
-    fetchRentalProducts();
-  }, [fetchRentalProducts]);
+    dispatch(fetchRentalProductsThunk());
+  }, [dispatch]);
 
   // Safe price formatting function
   const formatPrice = (price) => {
@@ -101,7 +113,7 @@ const RentalProducts = () => {
       const rentalDays = duration === 'daily' ? 1 : duration === 'weekly' ? 7 : 30;
       const rentalPrice = getDurationPrice(product, duration);
       
-      await addToCart({
+      await dispatch(addToCartThunk({
         productId: product.id,
         quantity: 1,
         isForRental: true,
@@ -110,7 +122,7 @@ const RentalProducts = () => {
         productImage: product.image || '📦',
         rentalDays: rentalDays,
         rentalDuration: duration
-      });
+      })).unwrap();
       
       console.log('Added to rental cart:', product.name, 'Duration:', duration);
     } catch (error) {
@@ -196,15 +208,15 @@ const RentalProducts = () => {
     }
   ];
 
-  if (productsError) {
+  if (error) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <FaExclamationTriangle className="text-red-500 text-6xl mx-auto mb-4" />
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Error Loading Rental Products</h2>
-          <p className="text-gray-600 mb-4">{productsError}</p>
+          <p className="text-gray-600 mb-4">{error}</p>
           <button
-            onClick={fetchRentalProducts}
+            onClick={() => dispatch(fetchRentalProductsThunk())}
             className="bg-blue-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
           >
             Try Again
@@ -314,7 +326,7 @@ const RentalProducts = () => {
       </section>
 
       {/* Loading State */}
-      {productsLoading && (
+      {isLoading && (
         <section className="py-12">
           <div className="container mx-auto px-4">
             <div className="flex justify-center items-center py-12">
@@ -328,7 +340,7 @@ const RentalProducts = () => {
       )}
 
       {/* Rental Products */}
-      {!productsLoading && filteredProducts.length === 0 && (
+      {!isLoading && filteredProducts.length === 0 && (
         <section className="py-12">
           <div className="container mx-auto px-4">
             <div className="bg-white rounded-2xl shadow-sm p-12 text-center">
@@ -361,7 +373,7 @@ const RentalProducts = () => {
       )}
 
       {/* Rental Products Grid */}
-      {!productsLoading && filteredProducts.length > 0 && (
+      {!isLoading && filteredProducts.length > 0 && (
         <section className="py-12">
           <div className="container mx-auto px-4">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">

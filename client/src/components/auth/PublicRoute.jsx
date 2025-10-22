@@ -1,12 +1,13 @@
 // ============================================
-// components/auth/PublicRoute.jsx - FIXED VERSION
+// components/auth/PublicRoute.jsx - REDUX VERSION
 // ============================================
 import { Navigate } from 'react-router-dom';
-import { useAuth } from '../../stores';
+import { useSelector } from 'react-redux';
+import { selectIsAuthenticated, selectIsLoading } from '../../features/auth/authSelectors';
 
 const PublicRoute = ({ children }) => {
-  // ✅ FIX: Get only what we need
-  const { isAuthenticated, isLoading } = useAuth();
+  const isAuthenticated = useSelector(selectIsAuthenticated);
+  const isLoading = useSelector(selectIsLoading);
 
   // ✅ Show loading spinner while checking authentication
   if (isLoading) {

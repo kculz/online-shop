@@ -1,13 +1,17 @@
 // ============================================
-// components/layouts/DashboardLayout.jsx
+// components/layouts/DashboardLayout.jsx - REDUX VERSION
 // ============================================
 import { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { useAuth } from '../../stores';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useDispatch, useSelector } from 'react-redux';
+import { logoutThunk } from '../../features/auth/authThunks';
+import { selectUser } from '../../features/auth/authSelectors';
 
 const DashboardLayout = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const { user, logout } = useAuth();
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
+  const user = useSelector(selectUser);
   const location = useLocation();
 
   const navigation = [
@@ -19,6 +23,15 @@ const DashboardLayout = ({ children }) => {
     { name: 'Users', href: '/admin/users', icon: '👥' },
     { name: 'Payments', href: '/admin/payments', icon: '💳' },
   ];
+
+  const handleLogout = async () => {
+    try {
+      await dispatch(logoutThunk()).unwrap();
+      navigate('/');
+    } catch (error) {
+      console.error('Logout failed:', error);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -92,7 +105,7 @@ const DashboardLayout = ({ children }) => {
                 <p className="text-xs font-medium text-gray-500">{user?.email}</p>
               </div>
               <button
-                onClick={logout}
+                onClick={handleLogout}
                 className="ml-3 flex-shrink-0 bg-white p-1 text-gray-400 rounded-full hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
               >
                 <span className="sr-only">Logout</span>
