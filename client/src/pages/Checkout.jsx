@@ -1,63 +1,85 @@
-import React, { useState } from 'react';
+// ============================================
+// pages/Checkout.jsx - FULLY INTEGRATED VERSION
+// ============================================
+import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
-  FaShoppingCart,
-  FaPhone,
-  FaCheckCircle,
-  FaTimesCircle,
-  FaCreditCard,
-  FaMobileAlt,
-  FaLock,
-  FaTrash,
-  FaPlus,
-  FaMinus,
-  FaArrowLeft,
-  FaShieldAlt,
-  FaMoneyBillWave
+  FaShoppingCart, FaPhone, FaCheckCircle, FaCreditCard,
+  FaMobileAlt, FaLock, FaTrash, FaPlus, FaMinus, FaArrowLeft,
+  FaShieldAlt, FaMoneyBillWave, FaSpinner
 } from 'react-icons/fa';
+import { useCart, useAuth, useOrders, usePayments } from '../stores';
 
 const Checkout = () => {
-  const [cartItems, setCartItems] = useState([
-    {
-      id: 1,
-      name: "ASUS ROG Strix RTX 4070",
-      price: 599.99,
-      quantity: 1,
-      image: "🎮"
-    },
-    {
-      id: 2,
-      name: "Logitech MX Master 3S",
-      price: 99.99,
-      quantity: 2,
-      image: "🖱️"
-    }
-  ]);
+  const navigate = useNavigate();
+  
+  // ✅ Use stable selectors
+  const isAuthenticated = useAuth(state => state.isAuthenticated);
+  const user = useAuth(state => state.user);
+  
+  const cart = useCart(state => state.cart);
+  const updateCartItem = useCart(state => state.updateCartItem);
+  const removeFromCart = useCart(state => state.removeFromCart);
+  const clearCart = useCart(state => state.clearCart);
+  
+  const createOrder = useOrders(state => state.createOrder);
+  const processEcocashPayment = usePayments(state => state.processEcocashPayment);
 
   const [paymentMethod, setPaymentMethod] = useState('ecocash');
   const [phoneNumber, setPhoneNumber] = useState('');
-  const [pin, setPin] = useState('');
   const [processing, setProcessing] = useState(false);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
+  const [orderId, setOrderId] = useState(null);
 
-  const updateQuantity = (id, change) => {
-    setCartItems(items =>
-      items.map(item =>
-        item.id === id
-          ? { ...item, quantity: Math.max(1, item.quantity + change) }
-          : item
-      )
-    );
+  // Redirect if not authenticated
+  useEffect(() => {
+    if (!isAuthenticated) {
+      sessionStorage.setItem('redirectAfterLogin', '/checkout');
+      navigate('/login');
+    }
+  }, [isAuthenticated, navigate]);
+
+  // Get cart items
+  const cartItems = useMemo(() => cart?.items || [], [cart?.items]);
+
+  // Redirect if cart is empty
+  useEffect(() => {
+    if (cartItems.length === 0 && !paymentSuccess) {
+      navigate('/cart');
+    }
+  }, [cartItems.length, paymentSuccess, navigate]);
+
+  const updateQuantity = async (itemId, change) => {
+    const item = cartItems.find(i => i.id === itemId);
+    if (!item) return;
+    
+    const newQuantity = Math.max(1, item.quantity + change);
+    await updateCartItem(itemId, { quantity: newQuantity });
   };
 
-  const removeItem = (id) => {
-    setCartItems(items => items.filter(item => item.id !== id));
+  const removeItem = async (itemId) => {
+    await removeFromCart(itemId);
   };
 
-  const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-  const tax = subtotal * 0.15;
-  const total = subtotal + tax;
+  // Calculate totals
+  const { subtotal, tax, total } = useMemo(() => {
+    const subtotalVal = cartItems.reduce((sum, item) => {
+      const price = parseFloat(item.priceAtAddition) || 0;
+      const quantity = parseInt(item.quantity) || 0;
+      return sum + (price * quantity);
+    }, 0);
+    
+    const taxVal = subtotalVal * 0.15;
+    const totalVal = subtotalVal + taxVal;
+    
+    return {
+      subtotal: subtotalVal,
+      tax: taxVal,
+      total: totalVal
+    };
+  }, [cartItems]);
 
-  const handlePayment = () => {
+  const handlePayment = async () => {
     if (!phoneNumber || phoneNumber.length < 10) {
       alert('Please enter a valid phone number');
       return;
@@ -65,13 +87,51 @@ const Checkout = () => {
     
     setProcessing(true);
     
-    // Simulate payment processing
-    setTimeout(() => {
+    try {
+      // Step 1: Create order
+      const orderResult = await createOrder({
+        items: cartItems.map(item => ({
+          productId: item.productId,
+          quantity: item.quantity,
+          price: item.priceAtAddition,
+          isRental: item.isForRental,
+          rentalDays: item.rentalDays
+        })),
+        totalAmount: total,
+        paymentMethod: paymentMethod
+      });
+      
+      if (!orderResult.success) {
+        throw new Error('Failed to create order');
+      }
+      
+      const createdOrderId = orderResult.order.id;
+      setOrderId(createdOrderId);
+      
+      // Step 2: Process payment
+      const paymentResult = await processEcocashPayment({
+        orderId: createdOrderId,
+        amount: total,
+        phoneNumber: phoneNumber,
+        paymentMethod: paymentMethod
+      });
+      
+      if (paymentResult.success) {
+        // Clear cart on success
+        await clearCart();
+        setPaymentSuccess(true);
+      } else {
+        throw new Error('Payment failed');
+      }
+    } catch (error) {
+      console.error('Payment error:', error);
+      alert('Payment processing failed. Please try again.');
+    } finally {
       setProcessing(false);
-      setPaymentSuccess(true);
-    }, 3000);
+    }
   };
 
+  // Success screen
   if (paymentSuccess) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-green-500 to-teal-600 flex items-center justify-center p-4">
@@ -83,13 +143,19 @@ const Checkout = () => {
           <p className="text-gray-600 mb-2">Your order has been confirmed</p>
           <p className="text-2xl font-bold text-green-600 mb-8">${total.toFixed(2)}</p>
           <div className="bg-gray-50 rounded-lg p-4 mb-6 text-left">
-            <p className="text-sm text-gray-600 mb-1">Transaction ID:</p>
-            <p className="font-mono text-sm font-semibold">ECO-{Math.random().toString(36).substr(2, 9).toUpperCase()}</p>
+            <p className="text-sm text-gray-600 mb-1">Order ID:</p>
+            <p className="font-mono text-sm font-semibold">#{orderId}</p>
           </div>
-          <button className="w-full bg-gradient-to-r from-green-600 to-teal-600 text-white py-3 rounded-lg font-semibold hover:from-green-700 hover:to-teal-700 transition-all mb-3">
-            Track Order
+          <button 
+            onClick={() => navigate('/profile')}
+            className="w-full bg-gradient-to-r from-green-600 to-teal-600 text-white py-3 rounded-lg font-semibold hover:from-green-700 hover:to-teal-700 transition-all mb-3"
+          >
+            View Orders
           </button>
-          <button className="w-full border border-gray-300 text-gray-700 py-3 rounded-lg font-semibold hover:bg-gray-50 transition-all">
+          <button 
+            onClick={() => navigate('/products')}
+            className="w-full border border-gray-300 text-gray-700 py-3 rounded-lg font-semibold hover:bg-gray-50 transition-all"
+          >
             Continue Shopping
           </button>
         </div>
@@ -102,7 +168,10 @@ const Checkout = () => {
       {/* Header */}
       <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white py-6">
         <div className="container mx-auto px-4">
-          <button className="flex items-center gap-2 mb-4 hover:text-gray-200 transition-colors">
+          <button 
+            onClick={() => navigate('/cart')}
+            className="flex items-center gap-2 mb-4 hover:text-gray-200 transition-colors"
+          >
             <FaArrowLeft />
             <span>Back to Cart</span>
           </button>
@@ -132,11 +201,14 @@ const Checkout = () => {
                   {cartItems.map((item) => (
                     <div key={item.id} className="flex gap-4 p-4 bg-gray-50 rounded-xl">
                       <div className="w-20 h-20 bg-white rounded-lg flex items-center justify-center text-4xl">
-                        {item.image}
+                        {item.productImage || '📦'}
                       </div>
                       <div className="flex-1">
-                        <h3 className="font-semibold text-gray-900 mb-2">{item.name}</h3>
-                        <p className="text-lg font-bold text-blue-600">${item.price.toFixed(2)}</p>
+                        <h3 className="font-semibold text-gray-900 mb-2">{item.productName}</h3>
+                        <p className="text-lg font-bold text-blue-600">${parseFloat(item.priceAtAddition).toFixed(2)}</p>
+                        {item.isForRental && (
+                          <p className="text-xs text-green-600 mt-1">Rental: {item.rentalDays} days</p>
+                        )}
                       </div>
                       <div className="flex flex-col items-end justify-between">
                         <button
@@ -295,16 +367,16 @@ const Checkout = () => {
 
               <button
                 onClick={handlePayment}
-                disabled={processing || cartItems.length === 0}
+                disabled={processing || cartItems.length === 0 || !phoneNumber}
                 className={`w-full py-4 rounded-lg font-semibold text-white transition-all ${
-                  processing
+                  processing || !phoneNumber
                     ? 'bg-gray-400 cursor-not-allowed'
                     : 'bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700 transform hover:scale-[1.02] shadow-lg'
                 }`}
               >
                 {processing ? (
                   <span className="flex items-center justify-center gap-2">
-                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    <FaSpinner className="animate-spin" />
                     Processing...
                   </span>
                 ) : (

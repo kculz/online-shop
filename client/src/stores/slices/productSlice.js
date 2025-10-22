@@ -3,6 +3,7 @@
 // ============================================
 
 import { createProductActions } from "../actions/productAction";
+import { createAdminProductActions } from "../actions/adminProductActions";
 
 // Initial state
 const initialState = {
@@ -20,4 +21,7 @@ export const productSlice = (set, get) => ({
 
   // Actions
   ...createProductActions(set, get),
+
+  // Admin Actions
+  ...createAdminProductActions(set, get),
 });

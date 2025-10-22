@@ -1,13 +1,14 @@
 // ============================================
-// components/auth/PublicRoute.jsx
+// components/auth/PublicRoute.jsx - FIXED VERSION
 // ============================================
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../stores';
 
 const PublicRoute = ({ children }) => {
+  // ✅ FIX: Get only what we need
   const { isAuthenticated, isLoading } = useAuth();
 
-  // Show loading spinner while checking authentication
+  // ✅ Show loading spinner while checking authentication
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -16,7 +17,7 @@ const PublicRoute = ({ children }) => {
     );
   }
 
-  // Redirect to home if already authenticated
+  // ✅ Redirect to home if already authenticated
   if (isAuthenticated) {
     return <Navigate to="/" replace />;
   }

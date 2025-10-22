@@ -1,5 +1,5 @@
 // ============================================
-// stores/store.js
+// stores/store.js - FIXED VERSION
 // ============================================
 import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
@@ -43,13 +43,26 @@ const useStore = create(
       }),
       {
         name: 'online-shop-storage',
+        // ✅ FIX: Persist authentication state properly
         partialize: (state) => ({
-          // Only persist these fields
+          // Persist auth data
           user: state.user,
           token: state.token,
           isAuthenticated: state.isAuthenticated,
-          cart: state.cart,
         }),
+        // ✅ FIX: Use sessionStorage instead of localStorage for security
+        storage: {
+          getItem: (name) => {
+            const str = sessionStorage.getItem(name);
+            return str ? JSON.parse(str) : null;
+          },
+          setItem: (name, value) => {
+            sessionStorage.setItem(name, JSON.stringify(value));
+          },
+          removeItem: (name) => {
+            sessionStorage.removeItem(name);
+          },
+        },
       }
     )
   )

@@ -4,49 +4,31 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { 
-  FaShoppingCart,
-  FaTrash,
-  FaPlus,
-  FaMinus,
-  FaArrowLeft,
-  FaArrowRight,
-  FaHeart,
-  FaTag,
-  FaTruck,
-  FaShieldAlt,
-  FaPercent,
-  FaGift,
-  FaSpinner
+  FaShoppingCart, FaTrash, FaPlus, FaMinus, FaArrowLeft,
+  FaArrowRight, FaHeart, FaTag, FaTruck, FaShieldAlt
 } from 'react-icons/fa';
-import useStore from '../stores/store';
+import { useAuth, useCart } from '../stores';
 
 const Cart = () => {
   const navigate = useNavigate();
   
-  // ✅ CORRECT: Select only the data you need with stable selectors
-  const isAuthenticated = useStore(state => state.isAuthenticated);
-  const cart = useStore(state => state.cart);
-  const isLoading = useStore(state => state.isLoading);
-  const cartError = useStore(state => state.error);
-  
-  // ✅ CORRECT: Select actions separately (they don't change)
-  const fetchCart = useStore(state => state.fetchCart);
-  const updateCartItem = useStore(state => state.updateCartItem);
-  const removeFromCart = useStore(state => state.removeFromCart);
-  const addToCart = useStore(state => state.addToCart);
+  // ✅ CORRECT: Select only what you need
+  const { isAuthenticated } = useAuth();
+  const { 
+    cart, 
+    isLoading,
+    error,
+    fetchCart, 
+    updateCartItem, 
+    removeFromCart,
+    clearError 
+  } = useCart();
   
   // Local state
   const [couponCode, setCouponCode] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState(null);
   const [savedItems, setSavedItems] = useState([]);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
-
-  // Mock products for demonstration
-  const mockProducts = useMemo(() => [
-    { id: 1, name: "Wireless Mouse", price: 29.99, image: "🖱️", category: "Accessories", isAvailable: true },
-    { id: 2, name: "Keyboard", price: 59.99, image: "⌨️", category: "Accessories", isAvailable: true },
-    { id: 3, name: "Headphones", price: 89.99, image: "🎧", category: "Audio", isAvailable: true }
-  ], []);
 
   // ✅ CORRECT: Fetch cart only once on mount
   useEffect(() => {
@@ -73,7 +55,7 @@ const Cart = () => {
     return () => {
       isMounted = false;
     };
-  }, []); // ✅ Empty deps - only run once on mount
+  }, [isAuthenticated, fetchCart, isInitialLoad]);
 
   // Safe utility functions
   const formatPrice = useCallback((price) => {
@@ -114,21 +96,6 @@ const Cart = () => {
     handleRemoveItem(item.id);
   }, [handleRemoveItem]);
 
-  const handleMoveToCart = useCallback(async (savedItem) => {
-    try {
-      await addToCart({
-        productId: savedItem.productId,
-        quantity: savedItem.quantity,
-        isForRental: savedItem.isForRental || false,
-        rentalDays: savedItem.rentalDays,
-        priceAtAddition: savedItem.priceAtAddition
-      });
-      setSavedItems(prev => prev.filter(item => item.id !== savedItem.id));
-    } catch (error) {
-      console.error('Failed to move item to cart:', error);
-    }
-  }, [addToCart]);
-
   const handleApplyCoupon = useCallback(() => {
     const code = couponCode.toUpperCase();
     if (code === 'SAVE10') {
@@ -152,18 +119,6 @@ const Cart = () => {
     navigate('/checkout');
   }, [isAuthenticated, cartItems.length, navigate]);
 
-  // Get product details (mock implementation)
-  const getProductDetails = useCallback((productId) => {
-    const product = mockProducts.find(p => p.id === productId);
-    return product || {
-      name: 'Product',
-      image: '📦',
-      category: 'General',
-      isAvailable: true,
-      price: 0
-    };
-  }, [mockProducts]);
-
   // Calculate totals
   const { subtotal, discount, shipping, tax, total } = useMemo(() => {
     const subtotalVal = cartItems.reduce((sum, item) => {
@@ -186,19 +141,12 @@ const Cart = () => {
     };
   }, [cartItems, appliedCoupon, safeNumber]);
 
-  // Recommended products
-  const recommendedProducts = useMemo(() => {
-    return mockProducts
-      .filter(product => !cartItems.some(item => item.productId === product.id))
-      .slice(0, 3);
-  }, [mockProducts, cartItems]);
-
   // Loading state
   if (isInitialLoad && isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <FaSpinner className="animate-spin text-4xl text-orange-600 mx-auto mb-4" />
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
           <p className="text-gray-600">Loading your cart...</p>
         </div>
       </div>
@@ -219,7 +167,7 @@ const Cart = () => {
             <Link
               to="/login"
               state={{ from: '/cart' }}
-              className="bg-gradient-to-r from-orange-500 to-pink-600 text-white px-8 py-3 rounded-lg font-semibold hover:from-orange-600 hover:to-pink-700 transition-all"
+              className="bg-blue-600 text-white px-8 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-all"
             >
               Sign In
             </Link>
@@ -239,7 +187,7 @@ const Cart = () => {
   if (cartItems.length === 0) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <div className="bg-gradient-to-r from-orange-500 to-pink-600 text-white py-6">
+        <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white py-6">
           <div className="container mx-auto px-4">
             <h1 className="text-3xl md:text-4xl font-bold flex items-center gap-3">
               <FaShoppingCart />
@@ -257,7 +205,7 @@ const Cart = () => {
             <p className="text-gray-600 mb-8">Looks like you haven't added anything to your cart yet</p>
             <Link
               to="/products"
-              className="bg-gradient-to-r from-orange-500 to-pink-600 text-white px-8 py-3 rounded-lg font-semibold hover:from-orange-600 hover:to-pink-700 transition-all inline-flex items-center gap-2"
+              className="bg-blue-600 text-white px-8 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-all inline-flex items-center gap-2"
             >
               Start Shopping <FaArrowRight />
             </Link>
@@ -271,7 +219,7 @@ const Cart = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-gradient-to-r from-orange-500 to-pink-600 text-white py-6">
+      <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white py-6">
         <div className="container mx-auto px-4">
           <Link to="/products" className="flex items-center gap-2 mb-4 hover:text-gray-200 transition-colors">
             <FaArrowLeft />
@@ -283,7 +231,7 @@ const Cart = () => {
               Shopping Cart
             </h1>
             <div className="text-right">
-              <p className="text-sm text-orange-100">Items in cart</p>
+              <p className="text-sm text-blue-100">Items in cart</p>
               <p className="text-2xl font-bold">{cartItems.length}</p>
             </div>
           </div>
@@ -311,25 +259,23 @@ const Cart = () => {
               
               <div className="space-y-4">
                 {cartItems.map((item) => {
-                  const product = getProductDetails(item.productId);
                   const itemPrice = safeNumber(item.priceAtAddition);
                   const itemQuantity = safeNumber(item.quantity);
                   const itemTotal = itemPrice * itemQuantity;
                   
                   return (
-                    <div key={item.id} className="border border-gray-200 rounded-xl p-4 hover:border-orange-300 transition-all">
+                    <div key={item.id} className="border border-gray-200 rounded-xl p-4 hover:border-blue-300 transition-all">
                       <div className="flex gap-4">
                         {/* Product Image */}
                         <div className="w-24 h-24 bg-gray-100 rounded-lg flex items-center justify-center text-4xl flex-shrink-0">
-                          {product.image || '📦'}
+                          {item.productImage || '📦'}
                         </div>
 
                         {/* Product Details */}
                         <div className="flex-1">
                           <div className="flex justify-between mb-2">
                             <div>
-                              <p className="text-xs text-gray-500 mb-1">{product.category}</p>
-                              <h3 className="font-semibold text-gray-900 mb-1">{product.name}</h3>
+                              <h3 className="font-semibold text-gray-900 mb-1">{item.productName || 'Product'}</h3>
                               {item.isForRental && (
                                 <p className="text-xs text-blue-600 font-medium">
                                   🗓️ Rental: {item.rentalDays || 7} days
@@ -338,7 +284,7 @@ const Cart = () => {
                               <p className="text-xs text-green-600 font-medium">✓ In Stock</p>
                             </div>
                             <div className="text-right">
-                              <p className="text-xl font-bold text-orange-600">${formatPrice(itemPrice)}</p>
+                              <p className="text-xl font-bold text-blue-600">${formatPrice(itemPrice)}</p>
                               <p className="text-sm text-gray-500">{item.isForRental ? 'per rental' : 'each'}</p>
                             </div>
                           </div>
@@ -372,7 +318,7 @@ const Cart = () => {
                             <div className="flex items-center gap-2">
                               <button
                                 onClick={() => handleSaveForLater(item)}
-                                className="p-2 text-gray-600 hover:text-orange-600 transition-colors"
+                                className="p-2 text-gray-600 hover:text-blue-600 transition-colors"
                                 title="Save for later"
                               >
                                 <FaHeart />
@@ -393,74 +339,6 @@ const Cart = () => {
                 })}
               </div>
             </div>
-
-            {/* Saved for Later */}
-            {savedItems.length > 0 && (
-              <div className="bg-white rounded-2xl shadow-sm p-6">
-                <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-                  <FaHeart className="text-pink-500" />
-                  Saved for Later ({savedItems.length})
-                </h2>
-                <div className="grid md:grid-cols-2 gap-4">
-                  {savedItems.map((item) => {
-                    const product = getProductDetails(item.productId);
-                    const itemPrice = safeNumber(item.priceAtAddition);
-                    
-                    return (
-                      <div key={item.id} className="border border-gray-200 rounded-lg p-4">
-                        <div className="flex gap-3 mb-3">
-                          <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center text-2xl">
-                            {product.image || '📦'}
-                          </div>
-                          <div className="flex-1">
-                            <h4 className="font-semibold text-sm text-gray-900 mb-1">{product.name}</h4>
-                            <p className="text-orange-600 font-bold">${formatPrice(itemPrice)}</p>
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => handleMoveToCart(item)}
-                          className="w-full bg-orange-500 text-white py-2 rounded-lg text-sm font-semibold hover:bg-orange-600 transition-colors"
-                        >
-                          Move to Cart
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* Recommended Products */}
-            {recommendedProducts.length > 0 && (
-              <div className="bg-white rounded-2xl shadow-sm p-6">
-                <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-                  <FaGift className="text-purple-500" />
-                  You May Also Like
-                </h2>
-                <div className="grid md:grid-cols-3 gap-4">
-                  {recommendedProducts.map((product) => (
-                    <div key={product.id} className="border border-gray-200 rounded-lg p-4 hover:border-orange-300 transition-all">
-                      <div className="w-full aspect-square bg-gray-100 rounded-lg flex items-center justify-center text-4xl mb-3">
-                        {product.image}
-                      </div>
-                      <h4 className="font-semibold text-sm text-gray-900 mb-2">{product.name}</h4>
-                      <p className="text-orange-600 font-bold mb-3">${formatPrice(product.price)}</p>
-                      <button 
-                        onClick={() => addToCart({
-                          productId: product.id,
-                          quantity: 1,
-                          isForRental: false,
-                          priceAtAddition: product.price
-                        })}
-                        className="w-full bg-gray-100 text-gray-900 py-2 rounded-lg text-sm font-semibold hover:bg-orange-500 hover:text-white transition-all"
-                      >
-                        Add to Cart
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
 
           {/* Order Summary Sidebar */}
@@ -479,11 +357,11 @@ const Cart = () => {
                     value={couponCode}
                     onChange={(e) => setCouponCode(e.target.value)}
                     placeholder="Enter code"
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                   <button
                     onClick={handleApplyCoupon}
-                    className="px-4 py-2 bg-orange-100 text-orange-600 rounded-lg font-semibold hover:bg-orange-200 transition-colors"
+                    className="px-4 py-2 bg-blue-100 text-blue-600 rounded-lg font-semibold hover:bg-blue-200 transition-colors"
                   >
                     Apply
                   </button>
@@ -506,7 +384,7 @@ const Cart = () => {
                 {appliedCoupon && (
                   <div className="flex justify-between text-green-600">
                     <span className="flex items-center gap-1">
-                      <FaPercent className="text-sm" />
+                      <FaTag className="text-sm" />
                       Discount ({appliedCoupon.discount * 100}%)
                     </span>
                     <span className="font-semibold">-${formatPrice(discount)}</span>
@@ -529,12 +407,12 @@ const Cart = () => {
 
               <div className="flex justify-between text-2xl font-bold text-gray-900 mb-6">
                 <span>Total</span>
-                <span className="text-orange-600">${formatPrice(total)}</span>
+                <span className="text-blue-600">${formatPrice(total)}</span>
               </div>
 
               <button 
                 onClick={handleProceedToCheckout}
-                className="w-full bg-gradient-to-r from-orange-500 to-pink-600 text-white py-4 rounded-lg font-semibold hover:from-orange-600 hover:to-pink-700 transition-all shadow-lg transform hover:scale-[1.02] flex items-center justify-center gap-2 mb-4"
+                className="w-full bg-blue-600 text-white py-4 rounded-lg font-semibold hover:bg-blue-700 transition-all shadow-lg transform hover:scale-[1.02] flex items-center justify-center gap-2 mb-4"
               >
                 Proceed to Checkout
                 <FaArrowRight />

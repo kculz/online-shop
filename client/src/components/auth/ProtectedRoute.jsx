@@ -1,14 +1,15 @@
 // ============================================
-// components/auth/ProtectedRoute.jsx
+// components/auth/ProtectedRoute.jsx - FIXED VERSION
 // ============================================
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../stores';
 
 const ProtectedRoute = ({ children, requireAdmin = false }) => {
+  // ✅ FIX: Get only what we need
   const { isAuthenticated, user, isLoading } = useAuth();
   const location = useLocation();
 
-  // Show loading spinner while checking authentication
+  // ✅ Show loading spinner while checking authentication
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -17,12 +18,12 @@ const ProtectedRoute = ({ children, requireAdmin = false }) => {
     );
   }
 
-  // Redirect to login if not authenticated
+  // ✅ Redirect to login if not authenticated
   if (!isAuthenticated) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // Check admin role if required
+  // ✅ Check admin role if required
   if (requireAdmin && user?.role !== 'admin') {
     return (
       <div className="min-h-screen flex items-center justify-center">

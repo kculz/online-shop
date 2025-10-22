@@ -1,8 +1,8 @@
 // ============================================
-// App.jsx
+// App.jsx - PROPERLY FIXED VERSION
 // ============================================
 import { Route, Routes } from "react-router-dom";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useAuth } from "./stores";
 
 // Layouts
@@ -37,16 +37,24 @@ import Users from "./pages/admin/Users";
 import Payments from "./pages/admin/Payments";
 
 function App() {
+  // ✅ CORRECT: Call useAuth() without parameters to get the whole object
   const { checkAuth } = useAuth();
+  
+  // ✅ Use ref to ensure checkAuth only runs once
+  const hasCheckedAuth = useRef(false);
 
   useEffect(() => {
-    // Check authentication status on app load
-    checkAuth();
-  }, [checkAuth]);
+    // ✅ Only check auth once on mount
+    if (!hasCheckedAuth.current) {
+      console.log('🔍 App mounted - checking authentication...');
+      checkAuth();
+      hasCheckedAuth.current = true;
+    }
+  }, []); // ✅ Empty deps - checkAuth is stable and won't change
 
   return (
     <Routes>
-      {/* Public Routes with Header & Footer */}
+      {/* PUBLIC ROUTES - No authentication required */}
       <Route path="/" element={
         <UserLayout>
           <HomePage />
@@ -71,7 +79,7 @@ function App() {
         </UserLayout>
       } />
 
-      {/* Public Routes without Header & Footer (Auth Pages) */}
+      {/* AUTH ROUTES - Redirect if already logged in */}
       <Route path="/login" element={
         <PublicRoute>
           <Login />
@@ -84,7 +92,7 @@ function App() {
         </PublicRoute>
       } />
 
-      {/* Protected User Routes */}
+      {/* PROTECTED USER ROUTES - Require authentication */}
       <Route path="/cart" element={
         <ProtectedRoute>
           <UserLayout>
@@ -109,7 +117,7 @@ function App() {
         </ProtectedRoute>
       } />
 
-      {/* Admin Routes */}
+      {/* ADMIN ROUTES - Require admin role */}
       <Route path="/admin" element={
         <AdminRoute>
           <DashboardLayout>

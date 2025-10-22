@@ -54,18 +54,24 @@ const Register = () => {
       return;
     }
 
-    const result = await signup({
-      username: formData.username,
-      email: formData.email,
-      password: formData.password,
-      role: formData.role
-    });
+   const result = await signup({
+    username: formData.username,
+    email: formData.email,
+    password: formData.password,
+    role: formData.role
+  });
 
-    if (result.success) {
-      // Navigate to home or dashboard
-      navigate('/');
-    }
-  };
+  if (result.success) {
+    // ✅ FIX: Redirect to previous page or home
+    const redirectPath = 
+      sessionStorage.getItem('redirectAfterLogin') || 
+      '/';
+    
+    sessionStorage.removeItem('redirectAfterLogin');
+    navigate(redirectPath, { replace: true });
+  }
+};
+  
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-500 via-teal-600 to-blue-600 flex items-center justify-center p-4 py-12">
@@ -306,7 +312,7 @@ const Register = () => {
         </div>
       </div>
     </div>
-  );
+);
 };
 
 export default Register;

@@ -1,5 +1,5 @@
 // ============================================
-// pages/Login.jsx
+// pages/Login.jsx - PROPERLY FIXED
 // ============================================
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -12,11 +12,13 @@ import {
   FaShieldAlt,
   FaArrowLeft
 } from 'react-icons/fa';
-import useStore from '../stores/store';
+import { useAuth } from '../stores';
 
 const Login = () => {
   const navigate = useNavigate();
-  const { signin, isLoading, error, clearError } = useStore();
+  
+  // ✅ CORRECT: Destructure only what you need
+  const { signin, isLoading, error, clearError } = useAuth();
   
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
@@ -86,7 +88,7 @@ const Login = () => {
               </div>
             )}
 
-            <div className="space-y-6">
+            <form onSubmit={handleSubmit} className="space-y-6">
               {/* Username Input */}
               <div>
                 <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-2">
@@ -105,6 +107,7 @@ const Login = () => {
                     className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                     placeholder="Enter your username"
                     disabled={isLoading}
+                    required
                   />
                 </div>
               </div>
@@ -127,6 +130,7 @@ const Login = () => {
                     className="w-full pl-12 pr-12 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                     placeholder="Enter your password"
                     disabled={isLoading}
+                    required
                   />
                   <button
                     type="button"
@@ -159,13 +163,13 @@ const Login = () => {
 
               {/* Submit Button */}
               <button
-                onClick={handleSubmit}
+                type="submit"
                 disabled={isLoading}
                 className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 rounded-lg font-semibold hover:from-blue-700 hover:to-purple-700 transform hover:scale-[1.02] transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isLoading ? 'Signing in...' : 'Sign In'}
               </button>
-            </div>
+            </form>
 
             {/* Sign Up Link */}
             <div className="mt-8 text-center">

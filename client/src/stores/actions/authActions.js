@@ -12,6 +12,9 @@ export const createAuthActions = (set, get) => ({
       const response = await authAPI.signin(credentials);
       const { user, token } = response.data;
       
+      // Store token in localStorage for persistence
+      localStorage.setItem('token', token);
+      
       set({
         user,
         token,
@@ -19,9 +22,6 @@ export const createAuthActions = (set, get) => ({
         isLoading: false,
         error: null,
       });
-      
-      // Store token in localStorage for persistence
-      localStorage.setItem('token', token);
       
       return { success: true, user };
     } catch (error) {
@@ -46,6 +46,9 @@ export const createAuthActions = (set, get) => ({
       const response = await authAPI.signup(userData);
       const { user, token } = response.data;
       
+      // Store token in localStorage for persistence
+      localStorage.setItem('token', token);
+      
       set({
         user,
         token,
@@ -53,8 +56,6 @@ export const createAuthActions = (set, get) => ({
         isLoading: false,
         error: null,
       });
-      
-      localStorage.setItem('token', token);
       
       return { success: true, user };
     } catch (error) {
@@ -80,6 +81,7 @@ export const createAuthActions = (set, get) => ({
         user: null,
         token: null,
         isAuthenticated: false,
+        isLoading: false,
         error: null,
       });
     }
@@ -89,18 +91,27 @@ export const createAuthActions = (set, get) => ({
   checkAuth: async () => {
     const token = localStorage.getItem('token');
     
+    // ✅ FIX: If no token, set state only once and return early
     if (!token) {
-      set({ isLoading: false });
+      set({ 
+        isAuthenticated: false, 
+        isLoading: false,
+        user: null,
+        token: null,
+        error: null
+      });
       return { isAuthenticated: false };
     }
     
     try {
-      set({ isLoading: true });
+      // ✅ FIX: Only set loading to true if we're actually checking
+      set({ isLoading: true, error: null });
       
       // Verify token with backend
       const response = await authAPI.verifyToken();
       const { user } = response.data;
       
+      // ✅ FIX: Set all state at once to avoid multiple renders
       set({
         user,
         token,
@@ -109,10 +120,11 @@ export const createAuthActions = (set, get) => ({
         error: null,
       });
       
-      return { isAuthenticated: true };
+      return { isAuthenticated: true, user };
     } catch (error) {
-      // Token is invalid, clear it
+      // ✅ FIX: Token is invalid, clear everything at once
       localStorage.removeItem('token');
+      
       set({
         user: null,
         token: null,

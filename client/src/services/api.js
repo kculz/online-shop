@@ -1,9 +1,12 @@
 // ============================================
-// services/api.js
+// 2. Fix services/api.js
 // ============================================
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:3000/api';
+// ✅ Make sure this matches your backend URL
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+
+console.log('🌐 API Base URL:', API_BASE_URL);
 
 // Create axios instance
 const api = axios.create({
@@ -11,38 +14,77 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  timeout: 10000, // 10 second timeout
 });
 
-// Add token to requests
+// Request interceptor - Add token to requests
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('authToken');
+    
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    
+    console.log(`📤 API Request: ${config.method?.toUpperCase()} ${config.url}`, {
+      headers: config.headers,
+      data: config.data
+    });
+    
     return config;
   },
-  (error) => Promise.reject(error)
-);
-
-// Response interceptor to handle errors
-api.interceptors.response.use(
-  (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem('token');
-      window.location.href = '/login';
-    }
+    console.error('❌ Request interceptor error:', error);
     return Promise.reject(error);
   }
 );
 
-// Auth API methods
+// Response interceptor - Handle errors
+api.interceptors.response.use(
+  (response) => {
+    console.log(`📥 API Response: ${response.config.url}`, response.data);
+    return response;
+  },
+  (error) => {
+    console.error('❌ API Error:', {
+      url: error.config?.url,
+      status: error.response?.status,
+      data: error.response?.data,
+      message: error.message
+    });
+    
+    if (error.response?.status === 401) {
+      sessionStorage.removeItem('authToken');
+      sessionStorage.removeItem('online-shop-storage');
+      
+      if (!window.location.pathname.includes('/login')) {
+        sessionStorage.setItem('redirectAfterLogin', window.location.pathname);
+        window.location.href = '/login';
+      }
+    }
+    
+    return Promise.reject(error);
+  }
+);
+
+// ✅ Auth API methods
 export const authAPI = {
-  signin: (credentials) => api.post('/auth/signin', credentials),
-  signup: (userData) => api.post('/auth/signup', userData),
-  verifyToken: () => api.get('/auth/verify'),
-  logout: () => api.post('/auth/logout'),
+  signin: (credentials) => {
+    console.log('🔐 Calling signin API:', credentials);
+    return api.post('/auth/signin', credentials);
+  },
+  signup: (userData) => {
+    console.log('📝 Calling signup API:', userData);
+    return api.post('/auth/signup', userData);
+  },
+  verifyToken: () => {
+    console.log('🔍 Calling verify token API');
+    return api.get('/auth/verify');
+  },
+  logout: () => {
+    console.log('👋 Calling logout API');
+    return api.post('/auth/logout');
+  },
 };
 
 // Products API methods
@@ -108,3 +150,4 @@ export const usersAPI = {
 };
 
 export default api;
+
