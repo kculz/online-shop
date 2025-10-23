@@ -42,18 +42,28 @@ function App() {
   const dispatch = useDispatch();
   const isLoading = useSelector(selectIsLoading);
   
-  // ✅ Use ref to ensure checkAuth only runs once
+  
   const hasCheckedAuth = useRef(false);
 
   useEffect(() => {
-    // ✅ Only check auth once on mount using the correct Redux thunk
     if (!hasCheckedAuth.current) {
       console.log('🔍 App mounted - checking authentication...');
-      dispatch(checkAuthThunk()); // ✅ FIXED: Using checkAuthThunk instead of verifyTokenThunk
-      hasCheckedAuth.current = true;
+      console.log('📝 Current token in localStorage:', localStorage.getItem('authToken'));
+      
+      dispatch(checkAuthThunk())
+        .unwrap()
+        .then((result) => {
+          console.log('✅ Auth check successful:', result.user);
+        })
+        .catch((error) => {
+          console.log('❌ Auth check failed:', error);
+        })
+        .finally(() => {
+          hasCheckedAuth.current = true;
+        });
     }
-  }, [dispatch]); // ✅ Add dispatch to dependencies
-
+  }, [dispatch]);
+  
   // Show loading state while checking initial authentication
   if (isLoading && !hasCheckedAuth.current) {
     return (

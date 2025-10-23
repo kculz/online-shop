@@ -1,12 +1,13 @@
 // ============================================
-// pages/Cart.jsx - REDUX VERSION
+// pages/Cart.jsx - REDUX VERSION (FIXED)
 // ============================================
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { 
   FaShoppingCart, FaTrash, FaPlus, FaMinus, FaArrowLeft,
-  FaArrowRight, FaHeart, FaTag, FaTruck, FaShieldAlt
+  FaArrowRight, FaHeart, FaTag, FaTruck, FaShieldAlt,
+  FaSpinner
 } from 'react-icons/fa';
 
 // Import Redux actions and selectors
@@ -15,6 +16,10 @@ import {
   updateCartItemThunk, 
   removeFromCartThunk 
 } from '../features/cart/cartThunks';
+import { 
+  updateQuantity,
+  removeItem 
+} from '../features/cart/cartSlice';
 import { 
   selectIsAuthenticated 
 } from '../features/auth/authSelectors';
@@ -41,6 +46,7 @@ const Cart = () => {
   const [appliedCoupon, setAppliedCoupon] = useState(null);
   const [savedItems, setSavedItems] = useState([]);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const [updatingItems, setUpdatingItems] = useState(new Set()); // Track items being updated
 
   // ✅ CORRECT: Fetch cart only once on mount
   useEffect(() => {
@@ -82,24 +88,98 @@ const Cart = () => {
     return isNaN(numValue) ? 0 : numValue;
   }, []);
 
-  // Action handlers
-  const handleUpdateQuantity = useCallback(async (itemId, newQuantity) => {
-    if (newQuantity < 1) return;
+  // ✅ FIXED: Optimistic quantity updates with immediate UI feedback
+  const handleIncrementQuantity = useCallback(async (itemId, currentQuantity) => {
+    const newQuantity = currentQuantity + 1;
+    
+    // Immediate UI update for better UX
+    dispatch(updateQuantity({ itemId, quantity: newQuantity }));
+    setUpdatingItems(prev => new Set(prev).add(itemId));
+    
     try {
+      // Sync with backend
       await dispatch(updateCartItemThunk({ 
         itemId, 
         updateData: { quantity: newQuantity } 
       })).unwrap();
     } catch (error) {
       console.error('Failed to update quantity:', error);
+      // Revert on error
+      dispatch(updateQuantity({ itemId, quantity: currentQuantity }));
+    } finally {
+      setUpdatingItems(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(itemId);
+        return newSet;
+      });
+    }
+  }, [dispatch]);
+
+  const handleDecrementQuantity = useCallback(async (itemId, currentQuantity) => {
+    const newQuantity = currentQuantity - 1;
+    
+    if (newQuantity < 1) {
+      // Remove item immediately for better UX
+      dispatch(removeItem(itemId));
+      setUpdatingItems(prev => new Set(prev).add(itemId));
+      
+      try {
+        // Sync with backend
+        await dispatch(removeFromCartThunk(itemId)).unwrap();
+      } catch (error) {
+        console.error('Failed to remove item:', error);
+        // Note: We'd need an "addItem" action to properly revert here
+        // For now, we'll just log the error
+      } finally {
+        setUpdatingItems(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(itemId);
+          return newSet;
+        });
+      }
+      return;
+    }
+    
+    // Immediate UI update
+    dispatch(updateQuantity({ itemId, quantity: newQuantity }));
+    setUpdatingItems(prev => new Set(prev).add(itemId));
+    
+    try {
+      // Sync with backend
+      await dispatch(updateCartItemThunk({ 
+        itemId, 
+        updateData: { quantity: newQuantity } 
+      })).unwrap();
+    } catch (error) {
+      console.error('Failed to update quantity:', error);
+      // Revert on error
+      dispatch(updateQuantity({ itemId, quantity: currentQuantity }));
+    } finally {
+      setUpdatingItems(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(itemId);
+        return newSet;
+      });
     }
   }, [dispatch]);
 
   const handleRemoveItem = useCallback(async (itemId) => {
+    // Immediate UI update
+    dispatch(removeItem(itemId));
+    setUpdatingItems(prev => new Set(prev).add(itemId));
+    
     try {
+      // Sync with backend
       await dispatch(removeFromCartThunk(itemId)).unwrap();
     } catch (error) {
       console.error('Failed to remove item:', error);
+      // Note: We'd need an "addItem" action to properly revert here
+    } finally {
+      setUpdatingItems(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(itemId);
+        return newSet;
+      });
     }
   }, [dispatch]);
 
@@ -152,6 +232,11 @@ const Cart = () => {
       total: totalVal
     };
   }, [cartItems, appliedCoupon, safeNumber]);
+
+  // Debug: Log cart items for troubleshooting
+  useEffect(() => {
+    console.log('🛒 Cart Items:', cartItems);
+  }, [cartItems]);
 
   // Loading state
   if (isInitialLoad && isLoading) {
@@ -244,7 +329,7 @@ const Cart = () => {
             </h1>
             <div className="text-right">
               <p className="text-sm text-blue-100">Items in cart</p>
-              <p className="text-2xl font-bold">{cartItems.length}</p>
+              <p className="text-2xl font-bold">{cartItemCount}</p>
             </div>
           </div>
         </div>
@@ -274,6 +359,7 @@ const Cart = () => {
                   const itemPrice = safeNumber(item.priceAtAddition);
                   const itemQuantity = safeNumber(item.quantity);
                   const itemTotal = itemPrice * itemQuantity;
+                  const isUpdating = updatingItems.has(item.id);
                   
                   return (
                     <div key={item.id} className="border border-gray-200 rounded-xl p-4 hover:border-blue-300 transition-all">
@@ -307,18 +393,29 @@ const Cart = () => {
                             <div className="flex items-center gap-3">
                               <div className="flex items-center gap-2 bg-gray-100 rounded-lg border border-gray-300">
                                 <button
-                                  onClick={() => handleUpdateQuantity(item.id, item.quantity - 1)}
-                                  disabled={item.quantity <= 1}
+                                  onClick={() => handleDecrementQuantity(item.id, itemQuantity)}
+                                  disabled={isUpdating || item.quantity <= 1}
                                   className="p-2 hover:bg-gray-200 transition-colors rounded-l-lg disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
-                                  <FaMinus className="text-sm" />
+                                  {isUpdating ? (
+                                    <FaSpinner className="text-sm animate-spin" />
+                                  ) : (
+                                    <FaMinus className="text-sm" />
+                                  )}
                                 </button>
-                                <span className="px-4 font-semibold">{itemQuantity}</span>
+                                <span className="px-4 font-semibold min-w-[3ch] text-center">
+                                  {itemQuantity}
+                                </span>
                                 <button
-                                  onClick={() => handleUpdateQuantity(item.id, item.quantity + 1)}
-                                  className="p-2 hover:bg-gray-200 transition-colors rounded-r-lg"
+                                  onClick={() => handleIncrementQuantity(item.id, itemQuantity)}
+                                  disabled={isUpdating}
+                                  className="p-2 hover:bg-gray-200 transition-colors rounded-r-lg disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
-                                  <FaPlus className="text-sm" />
+                                  {isUpdating ? (
+                                    <FaSpinner className="text-sm animate-spin" />
+                                  ) : (
+                                    <FaPlus className="text-sm" />
+                                  )}
                                 </button>
                               </div>
                               <p className="text-sm text-gray-600">
@@ -330,14 +427,16 @@ const Cart = () => {
                             <div className="flex items-center gap-2">
                               <button
                                 onClick={() => handleSaveForLater(item)}
-                                className="p-2 text-gray-600 hover:text-blue-600 transition-colors"
+                                disabled={isUpdating}
+                                className="p-2 text-gray-600 hover:text-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                 title="Save for later"
                               >
                                 <FaHeart />
                               </button>
                               <button
                                 onClick={() => handleRemoveItem(item.id)}
-                                className="p-2 text-gray-600 hover:text-red-600 transition-colors"
+                                disabled={isUpdating}
+                                className="p-2 text-gray-600 hover:text-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                 title="Remove"
                               >
                                 <FaTrash />
@@ -424,10 +523,20 @@ const Cart = () => {
 
               <button 
                 onClick={handleProceedToCheckout}
-                className="w-full bg-blue-600 text-white py-4 rounded-lg font-semibold hover:bg-blue-700 transition-all shadow-lg transform hover:scale-[1.02] flex items-center justify-center gap-2 mb-4"
+                disabled={isLoading}
+                className="w-full bg-blue-600 text-white py-4 rounded-lg font-semibold hover:bg-blue-700 transition-all shadow-lg transform hover:scale-[1.02] flex items-center justify-center gap-2 mb-4 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Proceed to Checkout
-                <FaArrowRight />
+                {isLoading ? (
+                  <>
+                    <FaSpinner className="animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    Proceed to Checkout
+                    <FaArrowRight />
+                  </>
+                )}
               </button>
 
               <Link

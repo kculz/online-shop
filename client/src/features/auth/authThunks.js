@@ -8,8 +8,7 @@ export const signinThunk = createAsyncThunk(
       const response = await authAPI.signin(credentials);
       const { user, token } = response.data;
       
-      // Store token
-      sessionStorage.setItem('authToken', token);
+      localStorage.setItem('authToken', token);
       
       return { user, token };
     } catch (error) {
@@ -26,8 +25,7 @@ export const signupThunk = createAsyncThunk(
       const response = await authAPI.signup(userData);
       const { user, token } = response.data;
       
-      // Store token
-      sessionStorage.setItem('authToken', token);
+      localStorage.setItem('authToken', token);
       
       return { user, token };
     } catch (error) {
@@ -40,7 +38,7 @@ export const signupThunk = createAsyncThunk(
 export const checkAuthThunk = createAsyncThunk(
   'auth/checkAuth',
   async (_, { rejectWithValue }) => {
-    const token = sessionStorage.getItem('authToken');
+    const token = localStorage.getItem('authToken');
     
     if (!token) {
       return rejectWithValue('No token found');
@@ -48,9 +46,12 @@ export const checkAuthThunk = createAsyncThunk(
     
     try {
       const response = await authAPI.verifyToken();
-      return { user: response.data.user };
+      return { 
+        user: response.data.user,
+        token: token // Return the existing token
+      };
     } catch (error) {
-      sessionStorage.removeItem('authToken');
+      localStorage.removeItem('authToken');
       return rejectWithValue('Invalid token');
     }
   }
@@ -61,12 +62,12 @@ export const logoutThunk = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       await authAPI.logout();
-      sessionStorage.removeItem('authToken');
-      return;
     } catch (error) {
-      // Still clear local storage even if API call fails
-      sessionStorage.removeItem('authToken');
-      return;
+      // Ignore API errors for logout
+      console.log('Logout API call failed:', error);
+    } finally {
+      // Always clear local storage
+      localStorage.removeItem('authToken');
     }
   }
 );

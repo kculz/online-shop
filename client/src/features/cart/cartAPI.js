@@ -1,13 +1,9 @@
-// ============================================
-// Cart API (features/cart/cartAPI.js)
-// ============================================
-
 import axiosInstance from '../../services/api';
 
 export const cartAPI = {
   /**
    * Get user's cart
-   * @returns {Promise<AxiosResponse>} - API response containing cart data
+   * @returns {Promise} - API response containing cart data
    */
   getCart: () => {
     return axiosInstance.get('/cart');
@@ -16,10 +12,7 @@ export const cartAPI = {
   /**
    * Add item to cart
    * @param {Object} itemData - Item data to add to cart
-   * @param {string|number} itemData.productId - Product ID
-   * @param {number} itemData.quantity - Quantity to add
-   * @param {boolean} itemData.isForRental - Whether item is for rental
-   * @returns {Promise<AxiosResponse>} - API response containing added item
+   * @returns {Promise} - API response containing added item
    */
   addItem: (itemData) => {
     return axiosInstance.post('/cart/items', itemData);
@@ -29,8 +22,7 @@ export const cartAPI = {
    * Update cart item quantity
    * @param {string|number} itemId - Cart item ID
    * @param {Object} updateData - Update data
-   * @param {number} updateData.quantity - New quantity
-   * @returns {Promise<AxiosResponse>} - API response containing updated item
+   * @returns {Promise} - API response containing updated item
    */
   updateItem: (itemId, updateData) => {
     return axiosInstance.put(`/cart/items/${itemId}`, updateData);
@@ -39,7 +31,7 @@ export const cartAPI = {
   /**
    * Remove item from cart
    * @param {string|number} itemId - Cart item ID
-   * @returns {Promise<AxiosResponse>} - API response
+   * @returns {Promise} - API response
    */
   removeItem: (itemId) => {
     return axiosInstance.delete(`/cart/items/${itemId}`);
@@ -47,7 +39,7 @@ export const cartAPI = {
 
   /**
    * Clear entire cart
-   * @returns {Promise<AxiosResponse>} - API response
+   * @returns {Promise} - API response
    */
   clearCart: () => {
     return axiosInstance.delete('/cart');

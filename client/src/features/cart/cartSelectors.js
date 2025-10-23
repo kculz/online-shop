@@ -1,6 +1,3 @@
-// ============================================
-// 5. Cart Selectors (features/cart/cartSelectors.js)
-// ============================================
 import { createSelector } from 'reselect';
 
 const selectCart = (state) => state.cart;
@@ -12,7 +9,10 @@ export const selectCartData = createSelector(
 
 export const selectCartItems = createSelector(
   [selectCartData],
-  (cart) => cart?.items || []
+  (cart) => {
+    if (!cart || !cart.items) return [];
+    return cart.items;
+  }
 );
 
 export const selectCartLoading = createSelector(
@@ -27,19 +27,23 @@ export const selectCartError = createSelector(
 
 export const selectCartTotal = createSelector(
   [selectCartItems],
-  (items) => items.reduce((total, item) => total + (item.priceAtAddition * item.quantity), 0)
+  (items) => items.reduce((total, item) => {
+    const price = item.priceAtAddition || 0;
+    const quantity = item.quantity || 0;
+    return total + (price * quantity);
+  }, 0)
 );
 
 export const selectCartItemCount = createSelector(
   [selectCartItems],
-  (items) => items.reduce((count, item) => count + item.quantity, 0)
+  (items) => items.reduce((count, item) => count + (item.quantity || 0), 0)
 );
 
 export const selectCartItemsWithDetails = createSelector(
   [selectCartItems],
   (items) => items.map(item => ({
     ...item,
-    totalPrice: item.priceAtAddition * item.quantity,
+    totalPrice: (item.priceAtAddition || 0) * (item.quantity || 0),
   }))
 );
 

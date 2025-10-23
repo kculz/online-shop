@@ -1,19 +1,20 @@
-// ============================================
-// features/auth/authSlice.js - ALTERNATIVE FIX
-// ============================================
 import { createSlice } from '@reduxjs/toolkit';
 
-const initialState = {
-  user: null,
-  token: sessionStorage.getItem('authToken') || null,
-  isAuthenticated: !!sessionStorage.getItem('authToken'),
-  isLoading: false,
-  error: null,
+// Helper function to get initial state
+const getInitialState = () => {
+  const token = localStorage.getItem('authToken');
+  return {
+    user: null,
+    token: token || null,
+    isAuthenticated: !!token,
+    isLoading: false,
+    error: null,
+  };
 };
 
 const authSlice = createSlice({
   name: 'auth',
-  initialState,
+  initialState: getInitialState(),
   reducers: {
     clearError: (state) => {
       state.error = null;
@@ -23,14 +24,14 @@ const authSlice = createSlice({
       state.token = action.payload.token;
       state.isAuthenticated = true;
       if (action.payload.token) {
-        sessionStorage.setItem('authToken', action.payload.token);
+        localStorage.setItem('authToken', action.payload.token);
       }
     },
     clearCredentials: (state) => {
       state.user = null;
       state.token = null;
       state.isAuthenticated = false;
-      sessionStorage.removeItem('authToken');
+      localStorage.removeItem('authToken');
     },
   },
   extraReducers: (builder) => {
@@ -46,17 +47,15 @@ const authSlice = createSlice({
         state.token = action.payload.token;
         state.isAuthenticated = true;
         state.error = null;
-        if (action.payload.token) {
-          sessionStorage.setItem('authToken', action.payload.token);
-        }
+        localStorage.setItem('authToken', action.payload.token);
       })
       .addCase('auth/signin/rejected', (state, action) => {
         state.isLoading = false;
-        state.error = action.payload;
         state.isAuthenticated = false;
         state.user = null;
         state.token = null;
-        sessionStorage.removeItem('authToken');
+        state.error = action.payload;
+        localStorage.removeItem('authToken');
       })
       // Signup
       .addCase('auth/signup/pending', (state) => {
@@ -69,17 +68,15 @@ const authSlice = createSlice({
         state.token = action.payload.token;
         state.isAuthenticated = true;
         state.error = null;
-        if (action.payload.token) {
-          sessionStorage.setItem('authToken', action.payload.token);
-        }
+        localStorage.setItem('authToken', action.payload.token);
       })
       .addCase('auth/signup/rejected', (state, action) => {
         state.isLoading = false;
-        state.error = action.payload;
         state.isAuthenticated = false;
         state.user = null;
         state.token = null;
-        sessionStorage.removeItem('authToken');
+        state.error = action.payload;
+        localStorage.removeItem('authToken');
       })
       // Check Auth
       .addCase('auth/checkAuth/pending', (state) => {
@@ -91,9 +88,10 @@ const authSlice = createSlice({
         state.user = action.payload.user;
         state.isAuthenticated = true;
         state.error = null;
+        // Ensure token is set if not already
         if (!state.token && action.payload.token) {
           state.token = action.payload.token;
-          sessionStorage.setItem('authToken', action.payload.token);
+          localStorage.setItem('authToken', action.payload.token);
         }
       })
       .addCase('auth/checkAuth/rejected', (state, action) => {
@@ -102,7 +100,7 @@ const authSlice = createSlice({
         state.token = null;
         state.isAuthenticated = false;
         state.error = action.payload;
-        sessionStorage.removeItem('authToken');
+        localStorage.removeItem('authToken');
       })
       // Logout
       .addCase('auth/logout/pending', (state) => {
@@ -114,7 +112,7 @@ const authSlice = createSlice({
         state.token = null;
         state.isAuthenticated = false;
         state.error = null;
-        sessionStorage.removeItem('authToken');
+        localStorage.removeItem('authToken');
       })
       .addCase('auth/logout/rejected', (state, action) => {
         state.isLoading = false;
@@ -122,7 +120,7 @@ const authSlice = createSlice({
         state.user = null;
         state.token = null;
         state.isAuthenticated = false;
-        sessionStorage.removeItem('authToken');
+        localStorage.removeItem('authToken');
       });
   },
 });

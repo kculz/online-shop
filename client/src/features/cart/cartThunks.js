@@ -1,16 +1,31 @@
-// ============================================
-// Cart Thunks (features/cart/cartThunks.js)
-// ============================================
-
 import { createAsyncThunk } from '@reduxjs/toolkit';
 import { cartAPI } from './cartAPI';
+import { selectCartItems } from './cartSelectors';
 
 export const fetchCartThunk = createAsyncThunk(
   'cart/fetchCart',
-  async (_, { rejectWithValue }) => {
+  async (_, { rejectWithValue, getState }) => {
     try {
-      const response = await cartAPI.getCart();
-      return response.data;
+      const state = getState();
+      const isAuthenticated = state.auth.isAuthenticated;
+      
+      // If user is authenticated, fetch from API
+      if (isAuthenticated) {
+        const response = await cartAPI.getCart();
+        return response.data;
+      } else {
+        // If not authenticated, return cart from localStorage
+        const savedCart = localStorage.getItem('cart');
+        if (savedCart) {
+          return JSON.parse(savedCart);
+        }
+        // Return empty cart structure
+        return {
+          id: 'local-cart',
+          userId: null,
+          items: []
+        };
+      }
     } catch (error) {
       return rejectWithValue(error.response?.data?.error || 'Failed to fetch cart');
     }
@@ -19,11 +34,35 @@ export const fetchCartThunk = createAsyncThunk(
 
 export const addToCartThunk = createAsyncThunk(
   'cart/addToCart',
-  async (itemData, { rejectWithValue }) => {
+  async (itemData, { rejectWithValue, getState }) => {
     try {
-      const formattedData = cartUtils.formatForAPI(itemData);
-      const response = await cartAPI.addItem(formattedData);
-      return response.data;
+      const state = getState();
+      const isAuthenticated = state.auth.isAuthenticated;
+      
+      // Format the data properly
+      const formattedData = {
+        productId: parseInt(itemData.productId),
+        quantity: parseInt(itemData.quantity) || 1,
+        isForRental: Boolean(itemData.isForRental),
+        rentalDays: itemData.rentalDays || (itemData.isForRental ? 7 : undefined),
+        priceAtAddition: parseFloat(itemData.priceAtAddition) || 0,
+        productName: itemData.productName,
+        productImage: itemData.productImage
+      };
+
+      // If authenticated, call API
+      if (isAuthenticated) {
+        const response = await cartAPI.addItem(formattedData);
+        return response.data;
+      } else {
+        // If not authenticated, return the item data for local storage
+        return {
+          id: `item-${Date.now()}`,
+          ...formattedData,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
+      }
     } catch (error) {
       return rejectWithValue(error.response?.data?.error || 'Failed to add item to cart');
     }
@@ -32,11 +71,23 @@ export const addToCartThunk = createAsyncThunk(
 
 export const updateCartItemThunk = createAsyncThunk(
   'cart/updateCartItem',
-  async ({ itemId, updateData }, { rejectWithValue }) => {
+  async ({ itemId, updateData }, { rejectWithValue, getState }) => {
     try {
-      const formattedData = cartUtils.formatForAPI(updateData);
-      const response = await cartAPI.updateItem(itemId, formattedData);
-      return response.data;
+      const state = getState();
+      const isAuthenticated = state.auth.isAuthenticated;
+      
+      if (isAuthenticated) {
+        // If authenticated, call API
+        const response = await cartAPI.updateItem(itemId, updateData);
+        return response.data;
+      } else {
+        // If not authenticated, return the update data
+        return {
+          ...updateData,
+          id: itemId,
+          updatedAt: new Date().toISOString()
+        };
+      }
     } catch (error) {
       return rejectWithValue(error.response?.data?.error || 'Failed to update cart item');
     }
@@ -45,9 +96,16 @@ export const updateCartItemThunk = createAsyncThunk(
 
 export const removeFromCartThunk = createAsyncThunk(
   'cart/removeFromCart',
-  async (itemId, { rejectWithValue }) => {
+  async (itemId, { rejectWithValue, getState }) => {
     try {
-      await cartAPI.removeItem(itemId);
+      const state = getState();
+      const isAuthenticated = state.auth.isAuthenticated;
+      
+      if (isAuthenticated) {
+        // If authenticated, call API
+        await cartAPI.removeItem(itemId);
+      }
+      // For both authenticated and guest users, return the itemId to remove from state
       return itemId;
     } catch (error) {
       return rejectWithValue(error.response?.data?.error || 'Failed to remove item from cart');
@@ -57,9 +115,15 @@ export const removeFromCartThunk = createAsyncThunk(
 
 export const clearCartThunk = createAsyncThunk(
   'cart/clearCart',
-  async (_, { rejectWithValue }) => {
+  async (_, { rejectWithValue, getState }) => {
     try {
-      await cartAPI.clearCart();
+      const state = getState();
+      const isAuthenticated = state.auth.isAuthenticated;
+      
+      if (isAuthenticated) {
+        await cartAPI.clearCart();
+      }
+      // For both authenticated and guest users, clear the cart
       return null;
     } catch (error) {
       return rejectWithValue(error.response?.data?.error || 'Failed to clear cart');
@@ -70,18 +134,25 @@ export const clearCartThunk = createAsyncThunk(
 // Additional utility thunks for common cart operations
 export const incrementCartItemThunk = createAsyncThunk(
   'cart/incrementCartItem',
-  async (itemId, { getState, rejectWithValue }) => {
+  async (itemId, { getState, rejectWithValue, dispatch }) => {
     try {
       const state = getState();
-      const cartItem = selectCartItems(state).find(item => item.id === itemId);
+      const cartItems = selectCartItems(state);
+      const cartItem = cartItems.find(item => item.id === itemId);
       
       if (!cartItem) {
         throw new Error('Cart item not found');
       }
 
-      const newQuantity = cartItem.quantity + 1;
-      const response = await cartAPI.updateItem(itemId, { quantity: newQuantity });
-      return response.data;
+      const newQuantity = (cartItem.quantity || 0) + 1;
+      
+      // Use the update thunk to handle both authenticated and guest scenarios
+      const result = await dispatch(updateCartItemThunk({ 
+        itemId, 
+        updateData: { quantity: newQuantity } 
+      })).unwrap();
+      
+      return result;
     } catch (error) {
       return rejectWithValue(error.response?.data?.error || 'Failed to increment cart item');
     }
@@ -90,25 +161,25 @@ export const incrementCartItemThunk = createAsyncThunk(
 
 export const decrementCartItemThunk = createAsyncThunk(
   'cart/decrementCartItem',
-  async (itemId, { getState, rejectWithValue }) => {
+  async (itemId, { getState, rejectWithValue, dispatch }) => {
     try {
       const state = getState();
-      const cartItem = selectCartItems(state).find(item => item.id === itemId);
+      const cartItems = selectCartItems(state);
+      const cartItem = cartItems.find(item => item.id === itemId);
       
       if (!cartItem) {
         throw new Error('Cart item not found');
       }
 
-      const newQuantity = cartItem.quantity - 1;
+      const newQuantity = Math.max((cartItem.quantity || 0) - 1, 1);
       
-      if (newQuantity <= 0) {
-        // Remove item if quantity becomes 0
-        await cartAPI.removeItem(itemId);
-        return itemId;
-      } else {
-        const response = await cartAPI.updateItem(itemId, { quantity: newQuantity });
-        return response.data;
-      }
+      // Use the update thunk to handle both authenticated and guest scenarios
+      const result = await dispatch(updateCartItemThunk({ 
+        itemId, 
+        updateData: { quantity: newQuantity } 
+      })).unwrap();
+      
+      return result;
     } catch (error) {
       return rejectWithValue(error.response?.data?.error || 'Failed to decrement cart item');
     }
@@ -118,7 +189,7 @@ export const decrementCartItemThunk = createAsyncThunk(
 // Thunk to add or update cart item (useful for product pages)
 export const addOrUpdateCartItemThunk = createAsyncThunk(
   'cart/addOrUpdateCartItem',
-  async ({ productId, quantity, isForRental }, { getState, rejectWithValue }) => {
+  async ({ productId, quantity, isForRental }, { getState, rejectWithValue, dispatch }) => {
     try {
       const state = getState();
       const existingItem = selectCartItems(state).find(
@@ -128,18 +199,22 @@ export const addOrUpdateCartItemThunk = createAsyncThunk(
       if (existingItem) {
         // Update existing item
         const newQuantity = existingItem.quantity + quantity;
-        const response = await cartAPI.updateItem(existingItem.id, { quantity: newQuantity });
-        return response.data;
+        const result = await dispatch(updateCartItemThunk({
+          itemId: existingItem.id,
+          updateData: { quantity: newQuantity }
+        })).unwrap();
+        return result;
       } else {
-        // Add new item
-        const response = await cartAPI.addItem({ productId, quantity, isForRental });
-        return response.data;
+        // Add new item - we need product details here, so this might need adjustment
+        const result = await dispatch(addToCartThunk({
+          productId,
+          quantity,
+          isForRental
+        })).unwrap();
+        return result;
       }
     } catch (error) {
       return rejectWithValue(error.response?.data?.error || 'Failed to update cart');
     }
   }
 );
-
-// Import selector for use in thunks (add this import at the top)
-import { selectCartItems } from './cartSelectors';
