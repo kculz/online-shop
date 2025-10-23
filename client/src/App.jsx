@@ -26,7 +26,7 @@ import ProductDetail from "./pages/ProductDetail";
 
 // Protected Pages (User)
 import Cart from "./pages/Cart";
-// import Checkout from "./pages/Checkout";
+import Checkout from "./pages/Checkout";
 // import Profile from "./pages/Profile";
 
 // Admin Pages
@@ -63,7 +63,7 @@ function App() {
         });
     }
   }, [dispatch]);
-  
+
   // Show loading state while checking initial authentication
   if (isLoading && !hasCheckedAuth.current) {
     return (
@@ -125,7 +125,7 @@ function App() {
         </ProtectedRoute>
       } />
       
-      {/* <Route path="/checkout" element={
+      <Route path="/checkout" element={
         <ProtectedRoute>
           <UserLayout>
             <Checkout />
@@ -133,7 +133,7 @@ function App() {
         </ProtectedRoute>
       } />
       
-      <Route path="/profile" element={
+      {/* <Route path="/profile" element={
         <ProtectedRoute>
           <UserLayout>
             <Profile />

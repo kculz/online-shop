@@ -19,6 +19,7 @@ app.use('/api/cart', require('./routes/cart.route'));
 app.use('/api/orders', require('./routes/order.route'));
 app.use('/api/rentals', require('./routes/rental.route'));
 app.use('/api/users', require('./routes/user.route'));
+app.use('/api/payments', require('./routes/payment.route'));
 
 db.sequelize.sync().then(() => {
     console.log('Database connected successfully');

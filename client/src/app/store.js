@@ -5,7 +5,7 @@ import productsReducer from '../features/products/productsSlice';
 import cartReducer from '../features/cart/cartSlice';
 // import ordersReducer from '../features/orders/ordersSlice';
 import categoriesReducer from '../features/categories/categoriesSlice';
-// import paymentsReducer from '../features/payments/paymentsSlice';
+import paymentsReducer from '../features/payments/paymentsSlice';
 import rentalsReducer from '../features/rentals/rentalsSlice';
 // import usersReducer from '../features/users/usersSlice';
 
@@ -16,7 +16,7 @@ export const store = configureStore({
     cart: cartReducer,
     // orders: ordersReducer,
     categories: categoriesReducer,
-    // payments: paymentsReducer,
+    payments: paymentsReducer,
     rentals: rentalsReducer,
     // users: usersReducer,
   },

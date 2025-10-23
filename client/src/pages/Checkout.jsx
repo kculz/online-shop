@@ -1,35 +1,59 @@
 // ============================================
-// pages/Checkout.jsx - FULLY INTEGRATED VERSION
+// pages/Checkout.jsx - REDUX VERSION
 // ============================================
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useDispatch, useSelector } from 'react-redux';
 import { 
   FaShoppingCart, FaPhone, FaCheckCircle, FaCreditCard,
   FaMobileAlt, FaLock, FaTrash, FaPlus, FaMinus, FaArrowLeft,
-  FaShieldAlt, FaMoneyBillWave, FaSpinner
+  FaShieldAlt, FaMoneyBillWave, FaSpinner, FaExclamationTriangle
 } from 'react-icons/fa';
-import { useCart, useAuth, useOrders, usePayments } from '../stores';
+
+// Import Redux actions and selectors
+import { completeCheckoutThunk } from '../features/payments/paymentsThunks';
+import { resetPayment } from '../features/payments/paymentsSlice';
+import { clearCartThunk } from '../features/cart/cartThunks';
+import { 
+  selectIsAuthenticated,
+  selectUser 
+} from '../features/auth/authSelectors';
+import { 
+  selectCartItems,
+  selectCartTotal 
+} from '../features/cart/cartSelectors';
+import {
+  selectPaymentStatus,
+  selectPaymentError,
+  selectIsProcessing,
+  selectIsPaymentSuccess,
+  selectCurrentOrder,
+  selectCurrentPayment,
+  selectIsPolling
+} from '../features/payments/paymentsSelectors';
 
 const Checkout = () => {
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   
-  // ✅ Use stable selectors
-  const isAuthenticated = useAuth(state => state.isAuthenticated);
-  const user = useAuth(state => state.user);
+  // Redux Selectors
+  const isAuthenticated = useSelector(selectIsAuthenticated);
+  const user = useSelector(selectUser);
+  const cartItems = useSelector(selectCartItems);
+  const cartTotal = useSelector(selectCartTotal);
   
-  const cart = useCart(state => state.cart);
-  const updateCartItem = useCart(state => state.updateCartItem);
-  const removeFromCart = useCart(state => state.removeFromCart);
-  const clearCart = useCart(state => state.clearCart);
-  
-  const createOrder = useOrders(state => state.createOrder);
-  const processEcocashPayment = usePayments(state => state.processEcocashPayment);
+  const paymentStatus = useSelector(selectPaymentStatus);
+  const paymentError = useSelector(selectPaymentError);
+  const isProcessing = useSelector(selectIsProcessing);
+  const isPaymentSuccess = useSelector(selectIsPaymentSuccess);
+  const currentOrder = useSelector(selectCurrentOrder);
+  const currentPayment = useSelector(selectCurrentPayment);
+  const isPolling = useSelector(selectIsPolling);
 
+  // Local state
   const [paymentMethod, setPaymentMethod] = useState('ecocash');
   const [phoneNumber, setPhoneNumber] = useState('');
-  const [processing, setProcessing] = useState(false);
-  const [paymentSuccess, setPaymentSuccess] = useState(false);
-  const [orderId, setOrderId] = useState(null);
+  const [shippingAddress, setShippingAddress] = useState('');
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -39,36 +63,23 @@ const Checkout = () => {
     }
   }, [isAuthenticated, navigate]);
 
-  // Get cart items
-  const cartItems = useMemo(() => cart?.items || [], [cart?.items]);
-
-  // Redirect if cart is empty
+  // Redirect if cart is empty and no successful payment
   useEffect(() => {
-    if (cartItems.length === 0 && !paymentSuccess) {
+    if (cartItems.length === 0 && !isPaymentSuccess) {
       navigate('/cart');
     }
-  }, [cartItems.length, paymentSuccess, navigate]);
+  }, [cartItems.length, isPaymentSuccess, navigate]);
 
-  const updateQuantity = async (itemId, change) => {
-    const item = cartItems.find(i => i.id === itemId);
-    if (!item) return;
-    
-    const newQuantity = Math.max(1, item.quantity + change);
-    await updateCartItem(itemId, { quantity: newQuantity });
-  };
-
-  const removeItem = async (itemId) => {
-    await removeFromCart(itemId);
-  };
+  // Reset payment state when component unmounts
+  useEffect(() => {
+    return () => {
+      dispatch(resetPayment());
+    };
+  }, [dispatch]);
 
   // Calculate totals
   const { subtotal, tax, total } = useMemo(() => {
-    const subtotalVal = cartItems.reduce((sum, item) => {
-      const price = parseFloat(item.priceAtAddition) || 0;
-      const quantity = parseInt(item.quantity) || 0;
-      return sum + (price * quantity);
-    }, 0);
-    
+    const subtotalVal = cartTotal;
     const taxVal = subtotalVal * 0.15;
     const totalVal = subtotalVal + taxVal;
     
@@ -77,19 +88,21 @@ const Checkout = () => {
       tax: taxVal,
       total: totalVal
     };
-  }, [cartItems]);
+  }, [cartTotal]);
 
   const handlePayment = async () => {
-    if (!phoneNumber || phoneNumber.length < 10) {
+    if (!phoneNumber || phoneNumber.length < 9) {
       alert('Please enter a valid phone number');
       return;
     }
-    
-    setProcessing(true);
-    
-    try {
-      // Step 1: Create order
-      const orderResult = await createOrder({
+
+    if (!shippingAddress.trim()) {
+      alert('Please enter your shipping address');
+      return;
+    }
+
+    const checkoutData = {
+      orderData: {
         items: cartItems.map(item => ({
           productId: item.productId,
           quantity: item.quantity,
@@ -98,41 +111,98 @@ const Checkout = () => {
           rentalDays: item.rentalDays
         })),
         totalAmount: total,
-        paymentMethod: paymentMethod
-      });
-      
-      if (!orderResult.success) {
-        throw new Error('Failed to create order');
-      }
-      
-      const createdOrderId = orderResult.order.id;
-      setOrderId(createdOrderId);
-      
-      // Step 2: Process payment
-      const paymentResult = await processEcocashPayment({
-        orderId: createdOrderId,
+        paymentMethod: paymentMethod,
+        shippingAddress: shippingAddress
+      },
+      paymentData: {
         amount: total,
         phoneNumber: phoneNumber,
         paymentMethod: paymentMethod
-      });
+      }
+    };
+
+    try {
+      const result = await dispatch(completeCheckoutThunk(checkoutData)).unwrap();
       
-      if (paymentResult.success) {
+      if (result.payment.success) {
         // Clear cart on success
-        await clearCart();
-        setPaymentSuccess(true);
-      } else {
-        throw new Error('Payment failed');
+        dispatch(clearCartThunk());
+        
+        // Show success message
+        console.log('Payment initiated successfully:', result.payment);
       }
     } catch (error) {
-      console.error('Payment error:', error);
-      alert('Payment processing failed. Please try again.');
-    } finally {
-      setProcessing(false);
+      console.error('Checkout failed:', error);
+      // Error is handled by the thunk and stored in paymentError
     }
   };
 
+  // Payment processing screen
+  if (isProcessing && currentPayment) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-3xl shadow-2xl p-12 text-center max-w-md w-full">
+          <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
+            {isPolling ? (
+              <FaSpinner className="text-5xl text-blue-600 animate-spin" />
+            ) : (
+              <FaMobileAlt className="text-5xl text-blue-600" />
+            )}
+          </div>
+          <h1 className="text-3xl font-bold text-gray-900 mb-4">
+            {isPolling ? 'Checking Payment...' : 'Payment Initiated'}
+          </h1>
+          <p className="text-gray-600 mb-6">
+            {isPolling 
+              ? 'Please wait while we confirm your payment...'
+              : 'Please check your phone for the EcoCash prompt'
+            }
+          </p>
+          
+          {currentPayment && (
+            <div className="bg-gray-50 rounded-lg p-4 mb-6 text-left space-y-2">
+              <div className="flex justify-between">
+                <span className="text-sm text-gray-600">Reference:</span>
+                <span className="font-mono text-sm font-semibold">{currentPayment.reference}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-sm text-gray-600">Amount:</span>
+                <span className="font-semibold">${total.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-sm text-gray-600">Phone:</span>
+                <span className="font-semibold">{phoneNumber}</span>
+              </div>
+            </div>
+          )}
+
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+            <div className="flex gap-3">
+              <FaExclamationTriangle className="text-blue-600 mt-1" />
+              <div>
+                <p className="text-sm font-medium text-blue-900 mb-1">What to do next:</p>
+                <ol className="text-sm text-blue-800 space-y-1 list-decimal list-inside">
+                  <li>Check your phone for the USSD prompt</li>
+                  <li>Enter your EcoCash PIN to authorize payment</li>
+                  <li>Wait for confirmation (this may take a moment)</li>
+                </ol>
+              </div>
+            </div>
+          </div>
+
+          <button 
+            onClick={() => dispatch(resetPayment())}
+            className="w-full border border-gray-300 text-gray-700 py-3 rounded-lg font-semibold hover:bg-gray-50 transition-all"
+          >
+            Cancel Payment
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   // Success screen
-  if (paymentSuccess) {
+  if (isPaymentSuccess) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-green-500 to-teal-600 flex items-center justify-center p-4">
         <div className="bg-white rounded-3xl shadow-2xl p-12 text-center max-w-md w-full">
@@ -142,10 +212,14 @@ const Checkout = () => {
           <h1 className="text-3xl font-bold text-gray-900 mb-4">Payment Successful!</h1>
           <p className="text-gray-600 mb-2">Your order has been confirmed</p>
           <p className="text-2xl font-bold text-green-600 mb-8">${total.toFixed(2)}</p>
-          <div className="bg-gray-50 rounded-lg p-4 mb-6 text-left">
-            <p className="text-sm text-gray-600 mb-1">Order ID:</p>
-            <p className="font-mono text-sm font-semibold">#{orderId}</p>
-          </div>
+          
+          {currentOrder && (
+            <div className="bg-gray-50 rounded-lg p-4 mb-6 text-left">
+              <p className="text-sm text-gray-600 mb-1">Order ID:</p>
+              <p className="font-mono text-sm font-semibold">#{currentOrder.id}</p>
+            </div>
+          )}
+
           <button 
             onClick={() => navigate('/profile')}
             className="w-full bg-gradient-to-r from-green-600 to-teal-600 text-white py-3 rounded-lg font-semibold hover:from-green-700 hover:to-teal-700 transition-all mb-3"
@@ -153,10 +227,41 @@ const Checkout = () => {
             View Orders
           </button>
           <button 
-            onClick={() => navigate('/products')}
+            onClick={() => {
+              dispatch(resetPayment());
+              navigate('/products');
+            }}
             className="w-full border border-gray-300 text-gray-700 py-3 rounded-lg font-semibold hover:bg-gray-50 transition-all"
           >
             Continue Shopping
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Error screen
+  if (paymentError && !isProcessing) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-3xl shadow-2xl p-12 text-center max-w-md w-full">
+          <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
+            <FaExclamationTriangle className="text-5xl text-red-600" />
+          </div>
+          <h1 className="text-3xl font-bold text-gray-900 mb-4">Payment Failed</h1>
+          <p className="text-gray-600 mb-6">{paymentError}</p>
+          
+          <button 
+            onClick={() => dispatch(resetPayment())}
+            className="w-full bg-red-600 text-white py-3 rounded-lg font-semibold hover:bg-red-700 transition-all mb-3"
+          >
+            Try Again
+          </button>
+          <button 
+            onClick={() => navigate('/cart')}
+            className="w-full border border-gray-300 text-gray-700 py-3 rounded-lg font-semibold hover:bg-gray-50 transition-all"
+          >
+            Back to Cart
           </button>
         </div>
       </div>
@@ -184,59 +289,25 @@ const Checkout = () => {
 
       <div className="container mx-auto px-4 py-8">
         <div className="grid lg:grid-cols-3 gap-8">
-          {/* Order Summary */}
-          <div className="lg:col-span-2">
-            <div className="bg-white rounded-2xl shadow-sm p-6 mb-6">
-              <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
-                <FaShoppingCart className="text-blue-600" />
-                Order Summary
-              </h2>
-
-              {cartItems.length === 0 ? (
-                <div className="text-center py-12">
-                  <p className="text-gray-500 text-lg">Your cart is empty</p>
+          {/* Order Summary & Payment Form */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Shipping Address */}
+            <div className="bg-white rounded-2xl shadow-sm p-6">
+              <h2 className="text-2xl font-bold text-gray-900 mb-6">Shipping Address</h2>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Delivery Address
+                  </label>
+                  <textarea
+                    value={shippingAddress}
+                    onChange={(e) => setShippingAddress(e.target.value)}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    placeholder="Enter your complete delivery address"
+                    rows="3"
+                  />
                 </div>
-              ) : (
-                <div className="space-y-4">
-                  {cartItems.map((item) => (
-                    <div key={item.id} className="flex gap-4 p-4 bg-gray-50 rounded-xl">
-                      <div className="w-20 h-20 bg-white rounded-lg flex items-center justify-center text-4xl">
-                        {item.productImage || '📦'}
-                      </div>
-                      <div className="flex-1">
-                        <h3 className="font-semibold text-gray-900 mb-2">{item.productName}</h3>
-                        <p className="text-lg font-bold text-blue-600">${parseFloat(item.priceAtAddition).toFixed(2)}</p>
-                        {item.isForRental && (
-                          <p className="text-xs text-green-600 mt-1">Rental: {item.rentalDays} days</p>
-                        )}
-                      </div>
-                      <div className="flex flex-col items-end justify-between">
-                        <button
-                          onClick={() => removeItem(item.id)}
-                          className="text-red-500 hover:text-red-600 transition-colors"
-                        >
-                          <FaTrash />
-                        </button>
-                        <div className="flex items-center gap-2 bg-white rounded-lg border border-gray-300">
-                          <button
-                            onClick={() => updateQuantity(item.id, -1)}
-                            className="p-2 hover:bg-gray-100 transition-colors"
-                          >
-                            <FaMinus className="text-sm" />
-                          </button>
-                          <span className="px-3 font-semibold">{item.quantity}</span>
-                          <button
-                            onClick={() => updateQuantity(item.id, 1)}
-                            className="p-2 hover:bg-gray-100 transition-colors"
-                          >
-                            <FaPlus className="text-sm" />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+              </div>
             </div>
 
             {/* Payment Method */}
@@ -367,14 +438,14 @@ const Checkout = () => {
 
               <button
                 onClick={handlePayment}
-                disabled={processing || cartItems.length === 0 || !phoneNumber}
+                disabled={isProcessing || cartItems.length === 0 || !phoneNumber || !shippingAddress.trim()}
                 className={`w-full py-4 rounded-lg font-semibold text-white transition-all ${
-                  processing || !phoneNumber
+                  isProcessing || !phoneNumber || !shippingAddress.trim()
                     ? 'bg-gray-400 cursor-not-allowed'
                     : 'bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700 transform hover:scale-[1.02] shadow-lg'
                 }`}
               >
-                {processing ? (
+                {isProcessing ? (
                   <span className="flex items-center justify-center gap-2">
                     <FaSpinner className="animate-spin" />
                     Processing...
