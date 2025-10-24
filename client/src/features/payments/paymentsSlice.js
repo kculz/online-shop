@@ -116,18 +116,49 @@ const paymentSlice = createSlice({
       .addCase(checkPaymentStatusThunk.fulfilled, (state, action) => {
         const { paymentId, status } = action.payload;
         
-        if (state.currentPayment && state.currentPayment.paymentId === paymentId) {
-          state.currentPayment.status = status.status;
+        console.log('📊 [Slice] Payment status update:', {
+          paymentId,
+          status: status.status,
+          success: status.success
+        });
+        
+        if (state.currentPayment) {
+          // Update the payment status with the full status object
+          state.currentPayment.status = status;
           
-          if (status.status === 'paid') {
+          const currentStatus = status.status;
+          const isSuccess = status.success === true;
+          
+          // Only mark as success if status is 'paid' AND success is true
+          if (currentStatus === 'paid' && isSuccess === true) {
             state.status = 'success';
             state.isPolling = false;
-          } else if (status.status === 'cancelled') {
+            state.error = null;
+            
+            // Clear polling interval
+            if (state.pollInterval) {
+              clearInterval(state.pollInterval);
+              state.pollInterval = null;
+            }
+          } 
+          // Mark as failed if status is 'cancelled' or 'failed'
+          else if (currentStatus === 'cancelled' || currentStatus === 'failed') {
             state.status = 'failed';
-            state.error = 'Payment was cancelled';
+            state.error = status.message || `Payment ${currentStatus}`;
             state.isPolling = false;
+            
+            // Clear polling interval
+            if (state.pollInterval) {
+              clearInterval(state.pollInterval);
+              state.pollInterval = null;
+            }
           }
-          // If pending, continue polling
+          // If status is 'sent' or other intermediate states, keep polling
+          else {
+            state.status = 'processing';
+            state.isPolling = true;
+            state.error = null;
+          }
         }
       })
       .addCase(checkPaymentStatusThunk.rejected, (state, action) => {

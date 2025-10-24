@@ -1,43 +1,70 @@
 import axiosInstance from '../../services/api';
-
 export const paymentAPI = {
   /**
    * Process EcoCash payment
-   * @param {Object} paymentData - Payment data
-   * @param {string} paymentData.orderId - Order ID
-   * @param {number} paymentData.amount - Payment amount
-   * @param {string} paymentData.phoneNumber - EcoCash phone number
-   * @param {string} paymentData.paymentMethod - Payment method ('ecocash')
-   * @returns {Promise} - API response
    */
-  processEcocashPayment: (paymentData) => {
-    return axiosInstance.post('/payments/ecocash', paymentData);
+  async processEcocashPayment(paymentData) {
+    console.log('💰 [API] Processing EcoCash payment:', paymentData);
+    try {
+      const response = await axiosInstance.post('/payments/ecocash', paymentData);
+      console.log('✅ [API] EcoCash payment response:', response.data);
+      return response;
+    } catch (error) {
+      console.error('❌ [API] EcoCash payment error:', {
+        status: error.response?.status,
+        data: error.response?.data,
+        message: error.message
+      });
+      throw error;
+    }
   },
 
   /**
    * Check payment status
-   * @param {string} paymentId - Payment ID
-   * @returns {Promise} - API response with payment status
    */
-  checkPaymentStatus: (paymentId) => {
-    return axiosInstance.get(`/payments/status/${paymentId}`);
+  async checkPaymentStatus(paymentId) {
+    console.log('🔍 [API] Checking payment status:', paymentId);
+    try {
+      const response = await axiosInstance.get(`/payments/status/${paymentId}`);
+      console.log('✅ [API] Payment status response:', response.data);
+      return response;
+    } catch (error) {
+      console.error('❌ [API] Payment status check error:', error.response?.data);
+      throw error;
+    }
   },
 
   /**
    * Get payment history
-   * @returns {Promise} - API response with payment history
    */
-  getPaymentHistory: () => {
-    return axiosInstance.get('/payments/history');
+  async getPaymentHistory() {
+    console.log('📚 [API] Getting payment history');
+    try {
+      const response = await axiosInstance.get('/payments/history');
+      return response;
+    } catch (error) {
+      console.error('❌ [API] Payment history error:', error.response?.data);
+      throw error;
+    }
   },
 
   /**
    * Create order
-   * @param {Object} orderData - Order data
-   * @returns {Promise} - API response with created order
    */
-  createOrder: (orderData) => {
-    return axiosInstance.post('/orders', orderData);
+  async createOrder(orderData) {
+    console.log('📦 [API] Creating order:', orderData);
+    try {
+      const response = await axiosInstance.post('/orders', orderData);
+      console.log('✅ [API] Order creation response:', response.data);
+      return response;
+    } catch (error) {
+      console.error('❌ [API] Order creation error:', {
+        status: error.response?.status,
+        data: error.response?.data,
+        message: error.message
+      });
+      throw error;
+    }
   },
 };
 
@@ -45,14 +72,10 @@ export const paymentAPI = {
 export const paymentUtils = {
   /**
    * Format phone number for EcoCash
-   * @param {string} phoneNumber - Raw phone number
-   * @returns {string} - Formatted phone number
    */
   formatPhoneNumber: (phoneNumber) => {
-    // Remove any non-digit characters
     const cleaned = phoneNumber.replace(/\D/g, '');
     
-    // Ensure it starts with 263 for Zimbabwe
     if (cleaned.startsWith('0')) {
       return '263' + cleaned.slice(1);
     } else if (cleaned.startsWith('+263')) {
@@ -66,13 +89,10 @@ export const paymentUtils = {
 
   /**
    * Validate EcoCash phone number
-   * @param {string} phoneNumber - Phone number to validate
-   * @returns {Object} - Validation result
    */
   validateEcocashNumber: (phoneNumber) => {
     const cleaned = phoneNumber.replace(/\D/g, '');
     
-    // Check if it's a valid Econet number
     const econetPrefixes = ['77', '78', '71', '73'];
     const prefix = cleaned.startsWith('263') ? cleaned.slice(3, 5) : 
                   cleaned.startsWith('0') ? cleaned.slice(1, 3) : 

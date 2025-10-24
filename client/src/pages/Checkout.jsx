@@ -1,7 +1,7 @@
 // ============================================
 // pages/Checkout.jsx - REDUX VERSION
 // ============================================
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { 
@@ -11,8 +11,8 @@ import {
 } from 'react-icons/fa';
 
 // Import Redux actions and selectors
-import { completeCheckoutThunk } from '../features/payments/paymentsThunks';
-import { resetPayment } from '../features/payments/paymentsSlice';
+import { checkPaymentStatusThunk, completeCheckoutThunk } from '../features/payments/paymentsThunks';
+import { resetPayment, startPolling, stopPolling } from '../features/payments/paymentsSlice';
 import { clearCartThunk } from '../features/cart/cartThunks';
 import { 
   selectIsAuthenticated,
@@ -31,6 +31,7 @@ import {
   selectCurrentPayment,
   selectIsPolling
 } from '../features/payments/paymentsSelectors';
+import { paymentUtils } from '../features/payments/paymentsAPI';
 
 const Checkout = () => {
   const navigate = useNavigate();
@@ -54,6 +55,7 @@ const Checkout = () => {
   const [paymentMethod, setPaymentMethod] = useState('ecocash');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [shippingAddress, setShippingAddress] = useState('');
+  const pollIntervalRef = useRef(null);
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -73,6 +75,9 @@ const Checkout = () => {
   // Reset payment state when component unmounts
   useEffect(() => {
     return () => {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+      }
       dispatch(resetPayment());
     };
   }, [dispatch]);
@@ -91,6 +96,8 @@ const Checkout = () => {
   }, [cartTotal]);
 
   const handlePayment = async () => {
+    console.log('🔄 [Checkout] Starting payment process...');
+    
     if (!phoneNumber || phoneNumber.length < 9) {
       alert('Please enter a valid phone number');
       return;
@@ -101,105 +108,258 @@ const Checkout = () => {
       return;
     }
 
+    // Validate phone number first
+    const validation = paymentUtils.validateEcocashNumber(phoneNumber);
+    if (!validation.isValid) {
+      alert('Please enter a valid EcoCash number (Econet network)');
+      return;
+    }
+
+    // Use the correct data structure
     const checkoutData = {
       orderData: {
-        items: cartItems.map(item => ({
-          productId: item.productId,
-          quantity: item.quantity,
-          price: item.priceAtAddition,
-          isRental: item.isForRental,
-          rentalDays: item.rentalDays
-        })),
-        totalAmount: total,
-        paymentMethod: paymentMethod,
-        shippingAddress: shippingAddress
+        shippingAddress: shippingAddress,
+        paymentMethod: 'ecocash'
       },
       paymentData: {
-        amount: total,
-        phoneNumber: phoneNumber,
-        paymentMethod: paymentMethod
+        phoneNumber: phoneNumber
       }
     };
+
+    console.log('📤 [Checkout] Sending checkout data:', checkoutData);
 
     try {
       const result = await dispatch(completeCheckoutThunk(checkoutData)).unwrap();
       
+      console.log('✅ [Checkout] Checkout completed:', result);
+      
       if (result.payment.success) {
-        // Clear cart on success
-        dispatch(clearCartThunk());
+        // Start polling for payment status
+        let paymentIdentifier;
         
-        // Show success message
-        console.log('Payment initiated successfully:', result.payment);
+        if (result.payment.paymentId) {
+          paymentIdentifier = result.payment.paymentId;
+        } else if (result.payment.reference) {
+          paymentIdentifier = result.payment.reference;
+        } else if (result.payment.id) {
+          paymentIdentifier = result.payment.id;
+        }
+        
+        if (paymentIdentifier) {
+          console.log('🔍 [Checkout] Starting polling with identifier:', paymentIdentifier);
+          startPaymentPolling(paymentIdentifier);
+        } else {
+          console.warn('⚠️ [Checkout] No payment identifier found for polling');
+        }
       }
     } catch (error) {
-      console.error('Checkout failed:', error);
-      // Error is handled by the thunk and stored in paymentError
+      console.error('❌ [Checkout] Checkout failed:', error);
     }
   };
 
-  // Payment processing screen
-  if (isProcessing && currentPayment) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-3xl shadow-2xl p-12 text-center max-w-md w-full">
-          <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
-            {isPolling ? (
-              <FaSpinner className="text-5xl text-blue-600 animate-spin" />
-            ) : (
-              <FaMobileAlt className="text-5xl text-blue-600" />
-            )}
-          </div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-4">
-            {isPolling ? 'Checking Payment...' : 'Payment Initiated'}
-          </h1>
-          <p className="text-gray-600 mb-6">
-            {isPolling 
-              ? 'Please wait while we confirm your payment...'
-              : 'Please check your phone for the EcoCash prompt'
-            }
-          </p>
-          
-          {currentPayment && (
-            <div className="bg-gray-50 rounded-lg p-4 mb-6 text-left space-y-2">
-              <div className="flex justify-between">
-                <span className="text-sm text-gray-600">Reference:</span>
-                <span className="font-mono text-sm font-semibold">{currentPayment.reference}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-sm text-gray-600">Amount:</span>
-                <span className="font-semibold">${total.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-sm text-gray-600">Phone:</span>
-                <span className="font-semibold">{phoneNumber}</span>
-              </div>
-            </div>
-          )}
-
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-            <div className="flex gap-3">
-              <FaExclamationTriangle className="text-blue-600 mt-1" />
-              <div>
-                <p className="text-sm font-medium text-blue-900 mb-1">What to do next:</p>
-                <ol className="text-sm text-blue-800 space-y-1 list-decimal list-inside">
-                  <li>Check your phone for the USSD prompt</li>
-                  <li>Enter your EcoCash PIN to authorize payment</li>
-                  <li>Wait for confirmation (this may take a moment)</li>
-                </ol>
-              </div>
-            </div>
-          </div>
-
-          <button 
-            onClick={() => dispatch(resetPayment())}
-            className="w-full border border-gray-300 text-gray-700 py-3 rounded-lg font-semibold hover:bg-gray-50 transition-all"
-          >
-            Cancel Payment
-          </button>
-        </div>
-      </div>
-    );
+// Enhanced polling function with proper status handling
+const startPaymentPolling = (paymentIdentifier) => {
+  console.log('🔄 [Checkout] Starting payment polling for:', paymentIdentifier);
+  
+  const maxPollingTime = 300000; // 5 minutes
+  const startTime = Date.now();
+  
+  // Clear any existing interval
+  if (pollIntervalRef.current) {
+    clearInterval(pollIntervalRef.current);
   }
+  
+  pollIntervalRef.current = setInterval(async () => {
+    // Check if we've been polling for too long
+    if (Date.now() - startTime > maxPollingTime) {
+      console.log('⏰ [Checkout] Polling timeout reached');
+      clearInterval(pollIntervalRef.current);
+      pollIntervalRef.current = null;
+      dispatch(stopPolling());
+      return;
+    }
+    
+    try {
+      console.log('🔍 [Checkout] Polling payment status...');
+      const result = await dispatch(checkPaymentStatusThunk(paymentIdentifier)).unwrap();
+      
+      console.log('📊 [Checkout] Polling result:', result);
+      
+      // Extract status from the nested response
+      const statusData = result.status;
+      const currentStatus = statusData?.status;
+      const isSuccess = statusData?.success === true;
+      
+      console.log('📊 [Checkout] Parsed status:', {
+        currentStatus,
+        isSuccess,
+        message: statusData?.message
+      });
+      
+      // Only stop polling and show success if status is 'paid' AND success is true
+      if (currentStatus === 'paid' && isSuccess === true) {
+        console.log('✅ [Checkout] Payment confirmed!');
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+        dispatch(stopPolling());
+        
+        // Clear cart on successful payment
+        dispatch(clearCartThunk());
+      } 
+      // Stop polling and show error if cancelled or failed
+      else if (currentStatus === 'cancelled' || currentStatus === 'failed') {
+        console.log('❌ [Checkout] Payment failed or cancelled');
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+        dispatch(stopPolling());
+      }
+      // For 'sent' and other intermediate states, continue polling
+      else {
+        console.log('🔄 [Checkout] Payment still processing, continue polling... Status:', currentStatus);
+      }
+    } catch (error) {
+      console.error('❌ [Checkout] Polling error:', error);
+    }
+  }, 5000); // Poll every 5 seconds
+
+  dispatch(startPolling(pollIntervalRef.current));
+};
+
+  // Handle cancel payment
+  const handleCancelPayment = () => {
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current);
+      pollIntervalRef.current = null;
+    }
+    dispatch(resetPayment());
+  };
+
+  useEffect(() => {
+    console.log('🔍 [Checkout] Payment State Update:', {
+      status: paymentStatus,
+      error: paymentError,
+      isProcessing,
+      isPaymentSuccess,
+      currentOrder,
+      currentPayment,
+      isPolling
+    });
+  }, [paymentStatus, paymentError, isProcessing, isPaymentSuccess, currentOrder, currentPayment, isPolling]);
+
+  // Debug cart state
+  console.log('🛒 [Checkout] Cart State:', {
+    items: cartItems,
+    total: cartTotal,
+    itemsCount: cartItems.length
+  });
+
+// Update the payment processing screen section
+if (isProcessing && currentPayment) {
+  // Determine the display message based on current status
+  const currentStatus = currentPayment.status?.status || currentPayment.status || 'pending';
+  const statusMessage = currentPayment.status?.message || 'Payment processing';
+  
+  let displayMessage = 'Payment Initiated';
+  let displayDescription = 'Please check your phone for the EcoCash prompt';
+  let statusColor = 'text-blue-600';
+  
+  if (currentStatus === 'sent' || currentStatus === 'created') {
+    displayMessage = 'Payment Sent';
+    displayDescription = 'Payment request sent to your phone. Please authorize the payment.';
+    statusColor = 'text-yellow-600';
+  } else if (currentStatus === 'pending') {
+    displayMessage = 'Waiting for Payment';
+    displayDescription = 'Please complete the payment on your phone.';
+    statusColor = 'text-blue-600';
+  } else if (currentStatus === 'cancelled') {
+    displayMessage = 'Payment Cancelled';
+    displayDescription = 'The payment was cancelled. Please try again.';
+    statusColor = 'text-red-600';
+  } else if (currentStatus === 'failed') {
+    displayMessage = 'Payment Failed';
+    displayDescription = statusMessage || 'The payment failed. Please try again.';
+    statusColor = 'text-red-600';
+  } else if (currentStatus === 'paid') {
+    displayMessage = 'Payment Successful';
+    displayDescription = 'Your payment has been confirmed!';
+    statusColor = 'text-green-600';
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-3xl shadow-2xl p-12 text-center max-w-md w-full">
+        <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
+          {isPolling ? (
+            <FaSpinner className="text-5xl text-blue-600 animate-spin" />
+          ) : (
+            <FaMobileAlt className="text-5xl text-blue-600" />
+          )}
+        </div>
+        
+        <h1 className="text-3xl font-bold text-gray-900 mb-4">
+          {isPolling ? 'Checking Payment...' : displayMessage}
+        </h1>
+        
+        <p className="text-gray-600 mb-6">
+          {isPolling 
+            ? 'Please wait while we confirm your payment...'
+            : displayDescription
+          }
+        </p>
+        
+        {currentPayment && (
+          <div className="bg-gray-50 rounded-lg p-4 mb-6 text-left space-y-2">
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-gray-600">Current Status:</span>
+              <span className={`text-sm font-semibold ${statusColor}`}>
+                {typeof currentStatus === 'string' ? currentStatus.toUpperCase() : 'PROCESSING'}
+              </span>
+            </div>
+            {currentPayment.status?.message && (
+              <div className="flex justify-between">
+                <span className="text-sm text-gray-600">Message:</span>
+                <span className="text-sm font-semibold text-gray-700">{currentPayment.status.message}</span>
+              </div>
+            )}
+            <div className="flex justify-between">
+              <span className="text-sm text-gray-600">Reference:</span>
+              <span className="font-mono text-sm font-semibold">{currentPayment.reference}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-sm text-gray-600">Amount:</span>
+              <span className="font-semibold">${total.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-sm text-gray-600">Phone:</span>
+              <span className="font-semibold">{phoneNumber}</span>
+            </div>
+          </div>
+        )}
+
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+          <div className="flex gap-3">
+            <FaExclamationTriangle className="text-blue-600 mt-1" />
+            <div>
+              <p className="text-sm font-medium text-blue-900 mb-1">What to do next:</p>
+              <ol className="text-sm text-blue-800 space-y-1 list-decimal list-inside">
+                <li>Check your phone for the USSD prompt</li>
+                <li>Enter your EcoCash PIN to authorize payment</li>
+                <li>Wait for confirmation (this may take a moment)</li>
+              </ol>
+            </div>
+          </div>
+        </div>
+
+        <button 
+          onClick={handleCancelPayment}
+          className="w-full border border-gray-300 text-gray-700 py-3 rounded-lg font-semibold hover:bg-gray-50 transition-all"
+        >
+          Cancel Payment
+        </button>
+      </div>
+    </div>
+  );
+}
 
   // Success screen
   if (isPaymentSuccess) {
