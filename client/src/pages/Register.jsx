@@ -1,8 +1,9 @@
 // ============================================
-// pages/Register.jsx
+// pages/Register.jsx - REDUX VERSION
 // ============================================
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useDispatch, useSelector } from 'react-redux';
 import { 
   FaUser,
   FaEnvelope,
@@ -13,12 +14,26 @@ import {
   FaArrowLeft,
   FaCheckCircle
 } from 'react-icons/fa';
-import useStore from '../stores/store';
+
+// Import Redux actions and selectors
+import {  clearError } from '../features/auth/authSlice';
+import {
+  selectIsLoading,
+  selectError,
+  selectIsAuthenticated
+} from '../features/auth/authSelectors';
+import { signupThunk } from '../features/auth/authThunks';
 
 const Register = () => {
   const navigate = useNavigate();
-  const { signup, isLoading, error, clearError } = useStore();
+  const dispatch = useDispatch();
   
+  // Redux Selectors
+  const isLoading = useSelector(selectIsLoading);
+  const error = useSelector(selectError);
+  const isAuthenticated = useSelector(selectIsAuthenticated);
+
+  // Local state
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [formData, setFormData] = useState({
@@ -30,48 +45,105 @@ const Register = () => {
   });
   const [agreeToTerms, setAgreeToTerms] = useState(false);
   const [subscribeNewsletter, setSubscribeNewsletter] = useState(true);
+  const [formErrors, setFormErrors] = useState({});
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      const redirectPath = sessionStorage.getItem('redirectAfterLogin') || '/';
+      sessionStorage.removeItem('redirectAfterLogin');
+      navigate(redirectPath, { replace: true });
+    }
+  }, [isAuthenticated, navigate]);
+
+  // Clear errors when component unmounts
+  useEffect(() => {
+    return () => {
+      dispatch(clearError());
+    };
+  }, [dispatch]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-    if (error) clearError();
+    setFormData(prev => ({ 
+      ...prev, 
+      [name]: value 
+    }));
+    
+    // Clear field error when user types
+    if (formErrors[name]) {
+      setFormErrors(prev => ({
+        ...prev,
+        [name]: ''
+      }));
+    }
+    
+    // Clear Redux error when user starts typing
+    if (error) {
+      dispatch(clearError());
+    }
+  };
+
+  const validateForm = () => {
+    const errors = {};
+
+    if (!formData.username.trim()) {
+      errors.username = 'Username is required';
+    } else if (formData.username.length < 3) {
+      errors.username = 'Username must be at least 3 characters';
+    }
+
+    if (!formData.email.trim()) {
+      errors.email = 'Email is required';
+    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
+      errors.email = 'Please enter a valid email address';
+    }
+
+    if (!formData.password) {
+      errors.password = 'Password is required';
+    } else if (formData.password.length < 6) {
+      errors.password = 'Password must be at least 6 characters';
+    } else if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(formData.password)) {
+      errors.password = 'Password must contain uppercase, lowercase, and number';
+    }
+
+    if (!formData.confirmPassword) {
+      errors.confirmPassword = 'Please confirm your password';
+    } else if (formData.password !== formData.confirmPassword) {
+      errors.confirmPassword = 'Passwords do not match';
+    }
+
+    if (!agreeToTerms) {
+      errors.agreeToTerms = 'You must agree to the terms and conditions';
+    }
+
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!formData.username || !formData.email || !formData.password) {
+    if (!validateForm()) {
       return;
     }
 
-    if (formData.password !== formData.confirmPassword) {
-      alert('Passwords do not match');
-      return;
+    try {
+      const result = await dispatch(signupThunk({
+        username: formData.username,
+        email: formData.email,
+        password: formData.password,
+        role: formData.role
+      })).unwrap();
+
+      // Success is handled by the thunk and will trigger navigation via useEffect
+      console.log('Registration successful:', result);
+      
+    } catch (error) {
+      // Error is handled by Redux and will be displayed via selector
+      console.error('Registration failed:', error);
     }
-
-    if (!agreeToTerms) {
-      alert('Please agree to the terms and conditions');
-      return;
-    }
-
-   const result = await signup({
-    username: formData.username,
-    email: formData.email,
-    password: formData.password,
-    role: formData.role
-  });
-
-  if (result.success) {
-    // ✅ FIX: Redirect to previous page or home
-    const redirectPath = 
-      sessionStorage.getItem('redirectAfterLogin') || 
-      '/';
-    
-    sessionStorage.removeItem('redirectAfterLogin');
-    navigate(redirectPath, { replace: true });
-  }
-};
-  
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-500 via-teal-600 to-blue-600 flex items-center justify-center p-4 py-12">
@@ -104,13 +176,17 @@ const Register = () => {
 
           {/* Form */}
           <div className="p-8">
+            {/* Redux Error Display */}
             {error && (
               <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-                <p className="text-sm text-red-600">{error}</p>
+                <div className="flex items-center gap-2">
+                  <FaCheckCircle className="text-red-600" />
+                  <p className="text-sm text-red-600">{error}</p>
+                </div>
               </div>
             )}
 
-            <div className="space-y-5">
+            <form onSubmit={handleSubmit} className="space-y-5">
               {/* Username Input */}
               <div>
                 <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-2">
@@ -126,11 +202,16 @@ const Register = () => {
                     name="username"
                     value={formData.username}
                     onChange={handleInputChange}
-                    className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
+                    className={`w-full pl-12 pr-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all ${
+                      formErrors.username ? 'border-red-300' : 'border-gray-300'
+                    }`}
                     placeholder="Choose a username"
                     disabled={isLoading}
                   />
                 </div>
+                {formErrors.username && (
+                  <p className="mt-1 text-sm text-red-600">{formErrors.username}</p>
+                )}
               </div>
 
               {/* Email Input */}
@@ -148,11 +229,16 @@ const Register = () => {
                     name="email"
                     value={formData.email}
                     onChange={handleInputChange}
-                    className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
+                    className={`w-full pl-12 pr-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all ${
+                      formErrors.email ? 'border-red-300' : 'border-gray-300'
+                    }`}
                     placeholder="you@example.com"
                     disabled={isLoading}
                   />
                 </div>
+                {formErrors.email && (
+                  <p className="mt-1 text-sm text-red-600">{formErrors.email}</p>
+                )}
               </div>
 
               {/* Password Fields */}
@@ -171,7 +257,9 @@ const Register = () => {
                       name="password"
                       value={formData.password}
                       onChange={handleInputChange}
-                      className="w-full pl-12 pr-12 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
+                      className={`w-full pl-12 pr-12 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all ${
+                        formErrors.password ? 'border-red-300' : 'border-gray-300'
+                      }`}
                       placeholder="••••••••"
                       disabled={isLoading}
                     />
@@ -179,10 +267,14 @@ const Register = () => {
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
                       className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-gray-600"
+                      disabled={isLoading}
                     >
                       {showPassword ? <FaEyeSlash /> : <FaEye />}
                     </button>
                   </div>
+                  {formErrors.password && (
+                    <p className="mt-1 text-sm text-red-600">{formErrors.password}</p>
+                  )}
                 </div>
 
                 <div>
@@ -199,7 +291,9 @@ const Register = () => {
                       name="confirmPassword"
                       value={formData.confirmPassword}
                       onChange={handleInputChange}
-                      className="w-full pl-12 pr-12 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
+                      className={`w-full pl-12 pr-12 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all ${
+                        formErrors.confirmPassword ? 'border-red-300' : 'border-gray-300'
+                      }`}
                       placeholder="••••••••"
                       disabled={isLoading}
                     />
@@ -207,10 +301,14 @@ const Register = () => {
                       type="button"
                       onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                       className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-gray-600"
+                      disabled={isLoading}
                     >
                       {showConfirmPassword ? <FaEyeSlash /> : <FaEye />}
                     </button>
                   </div>
+                  {formErrors.confirmPassword && (
+                    <p className="mt-1 text-sm text-red-600">{formErrors.confirmPassword}</p>
+                  )}
                 </div>
               </div>
 
@@ -219,20 +317,20 @@ const Register = () => {
                 <p className="text-sm text-blue-800 font-medium mb-2">Password must contain:</p>
                 <div className="grid grid-cols-2 gap-2 text-xs text-blue-700">
                   <div className="flex items-center gap-2">
-                    <FaCheckCircle className="text-blue-500" />
-                    <span>At least 8 characters</span>
+                    <FaCheckCircle className={`text-${formData.password.length >= 6 ? 'green' : 'blue'}-500`} />
+                    <span>At least 6 characters</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <FaCheckCircle className="text-blue-500" />
+                    <FaCheckCircle className={`text-${/(?=.*[A-Z])/.test(formData.password) ? 'green' : 'blue'}-500`} />
                     <span>One uppercase letter</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <FaCheckCircle className="text-blue-500" />
+                    <FaCheckCircle className={`text-${/(?=.*[a-z])/.test(formData.password) ? 'green' : 'blue'}-500`} />
                     <span>One lowercase letter</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <FaCheckCircle className="text-blue-500" />
-                    <span>One number or symbol</span>
+                    <FaCheckCircle className={`text-${/(?=.*\d)/.test(formData.password) ? 'green' : 'blue'}-500`} />
+                    <span>One number</span>
                   </div>
                 </div>
               </div>
@@ -244,7 +342,10 @@ const Register = () => {
                     type="checkbox"
                     checked={agreeToTerms}
                     onChange={(e) => setAgreeToTerms(e.target.checked)}
-                    className="w-4 h-4 mt-1 text-green-600 border-gray-300 rounded focus:ring-green-500 cursor-pointer"
+                    className={`w-4 h-4 mt-1 text-green-600 border-gray-300 rounded focus:ring-green-500 cursor-pointer ${
+                      formErrors.agreeToTerms ? 'border-red-300' : ''
+                    }`}
+                    disabled={isLoading}
                   />
                   <span className="ml-3 text-sm text-gray-600">
                     I agree to the{' '}
@@ -257,6 +358,9 @@ const Register = () => {
                     </button>
                   </span>
                 </label>
+                {formErrors.agreeToTerms && (
+                  <p className="ml-7 text-sm text-red-600">{formErrors.agreeToTerms}</p>
+                )}
 
                 <label className="flex items-start cursor-pointer">
                   <input
@@ -264,6 +368,7 @@ const Register = () => {
                     checked={subscribeNewsletter}
                     onChange={(e) => setSubscribeNewsletter(e.target.checked)}
                     className="w-4 h-4 mt-1 text-green-600 border-gray-300 rounded focus:ring-green-500 cursor-pointer"
+                    disabled={isLoading}
                   />
                   <span className="ml-3 text-sm text-gray-600">
                     Subscribe to our newsletter for exclusive deals and updates
@@ -273,13 +378,20 @@ const Register = () => {
 
               {/* Submit Button */}
               <button
-                onClick={handleSubmit}
+                type="submit"
                 disabled={isLoading}
-                className="w-full bg-gradient-to-r from-green-600 to-teal-600 text-white py-3 rounded-lg font-semibold hover:from-green-700 hover:to-teal-700 transform hover:scale-[1.02] transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed mt-6"
+                className="w-full bg-gradient-to-r from-green-600 to-teal-600 text-white py-3 rounded-lg font-semibold hover:from-green-700 hover:to-teal-700 transform hover:scale-[1.02] transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none mt-6"
               >
-                {isLoading ? 'Creating Account...' : 'Create Account'}
+                {isLoading ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Creating Account...
+                  </span>
+                ) : (
+                  'Create Account'
+                )}
               </button>
-            </div>
+            </form>
 
             {/* Sign In Link */}
             <div className="mt-6 text-center">
@@ -288,6 +400,7 @@ const Register = () => {
                 <button 
                   onClick={() => navigate('/login')}
                   className="text-green-600 hover:text-green-700 font-semibold"
+                  disabled={isLoading}
                 >
                   Sign in here
                 </button>
@@ -312,7 +425,7 @@ const Register = () => {
         </div>
       </div>
     </div>
-);
+  );
 };
 
 export default Register;

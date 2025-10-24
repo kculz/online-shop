@@ -19,7 +19,7 @@ import PublicRoute from "./components/auth/PublicRoute";
 // Public Pages
 import HomePage from "./pages/HomePage";
 import Login from "./pages/Login";
-// import Register from "./pages/Register";
+import Register from "./pages/Register";
 import AllProducts from "./pages/AllProducts";
 import RentalProducts from "./pages/RentalProducts";
 import ProductDetail from "./pages/ProductDetail";
@@ -112,11 +112,11 @@ function App() {
         </PublicRoute>
       } />
       
-      {/* <Route path="/register" element={
+      <Route path="/register" element={
         <PublicRoute>
           <Register />
         </PublicRoute>
-      } /> */}
+      } />
 
       {/* PROTECTED USER ROUTES - Require authentication */}
       <Route path="/cart" element={
