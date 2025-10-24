@@ -27,7 +27,9 @@ import ProductDetail from "./pages/ProductDetail";
 // Protected Pages (User)
 import Cart from "./pages/Cart";
 import Checkout from "./pages/Checkout";
-// import Profile from "./pages/Profile";
+import Orders from "./pages/Orders";
+import OrderDetails from "./pages/OrderDetails";
+import Profile from "./pages/Profile";
 
 // Admin Pages
 // import Dashboard from "./pages/admin/Dashboard";
@@ -132,14 +134,30 @@ function App() {
           </UserLayout>
         </ProtectedRoute>
       } />
-      
-      {/* <Route path="/profile" element={
+
+      <Route path="/orders" element={
+        <ProtectedRoute>
+          <UserLayout>
+            <Orders />
+          </UserLayout>
+        </ProtectedRoute>
+      } />
+
+       <Route path="/orders/:id" element={
+        <ProtectedRoute>
+          <UserLayout>
+            <OrderDetails />
+          </UserLayout>
+        </ProtectedRoute>
+      } />
+
+      <Route path="/profile" element={
         <ProtectedRoute>
           <UserLayout>
             <Profile />
           </UserLayout>
         </ProtectedRoute>
-      } /> */}
+      } />
 
       {/* ADMIN ROUTES - Require admin role
       <Route path="/admin" element={

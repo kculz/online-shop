@@ -3,22 +3,22 @@ import { setupListeners } from '@reduxjs/toolkit/query';
 import authReducer from '../features/auth/authSlice';
 import productsReducer from '../features/products/productsSlice';
 import cartReducer from '../features/cart/cartSlice';
-// import ordersReducer from '../features/orders/ordersSlice';
+import ordersReducer from '../features/orders/ordersSlice';
 import categoriesReducer from '../features/categories/categoriesSlice';
 import paymentsReducer from '../features/payments/paymentsSlice';
 import rentalsReducer from '../features/rentals/rentalsSlice';
-// import usersReducer from '../features/users/usersSlice';
+import usersReducer from '../features/users/usersSlice';
 
 export const store = configureStore({
   reducer: {
     auth: authReducer,
     products: productsReducer,
     cart: cartReducer,
-    // orders: ordersReducer,
+    orders: ordersReducer,
     categories: categoriesReducer,
     payments: paymentsReducer,
     rentals: rentalsReducer,
-    // users: usersReducer,
+    users: usersReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
