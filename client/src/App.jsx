@@ -39,7 +39,7 @@ import AdminOrders from "./pages/admin/Orders";
 import AddProduct from "./pages/admin/AddProduct";
 import EditProduct from "./pages/admin/EditProduct";
 import Rentals from "./pages/admin/Rentals";
-// import Users from "./pages/admin/Users";
+import Users from "./pages/admin/Users";
 // import Payments from "./pages/admin/Payments";
 
 function App() {
@@ -218,7 +218,7 @@ function App() {
         </AdminRoute>
       } />
 
-      {/*<Route path="/admin/users" element={
+      <Route path="/admin/users" element={
         <AdminRoute>
           <DashboardLayout>
             <Users />
@@ -226,7 +226,7 @@ function App() {
         </AdminRoute>
       } />
 
-      <Route path="/admin/payments" element={
+      {/*<Route path="/admin/payments" element={
         <AdminRoute>
           <DashboardLayout>
             <Payments />
