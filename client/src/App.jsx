@@ -40,7 +40,7 @@ import AddProduct from "./pages/admin/AddProduct";
 import EditProduct from "./pages/admin/EditProduct";
 import Rentals from "./pages/admin/Rentals";
 import Users from "./pages/admin/Users";
-// import Payments from "./pages/admin/Payments";
+import Payments from "./pages/admin/Payments";
 
 function App() {
   const dispatch = useDispatch();
@@ -226,13 +226,13 @@ function App() {
         </AdminRoute>
       } />
 
-      {/*<Route path="/admin/payments" element={
+      <Route path="/admin/payments" element={
         <AdminRoute>
           <DashboardLayout>
             <Payments />
           </DashboardLayout>
         </AdminRoute>
-      } /> */}
+      } />
 
       {/* 404 Route */}
       <Route path="*" element={
