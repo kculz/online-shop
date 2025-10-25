@@ -1,28 +1,58 @@
 // ============================================
-// pages/admin/Products.jsx
+// pages/admin/Products.jsx - REDUX VERSION
 // ============================================
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { useProducts, useCategories } from '../../stores';
-import { productSelectors } from '../../stores/selectors/productSelectors';
-import { categorySelectors } from '../../stores/selectors/categorySelectors';
+import { useDispatch, useSelector } from 'react-redux';
+
+// Import Redux actions and selectors
+import { 
+  fetchProductsThunk, 
+  deleteProductThunk, 
+  toggleAvailabilityThunk 
+} from '../../features/products/productsThunks';
+import { clearError } from '../../features/products/productsSlice';
+import { 
+  selectAllProducts, 
+  selectProductsLoading, 
+  selectProductsError 
+} from '../../features/products/productsSelectors';
+
+// Import categories if needed (assuming you have categories slice)
+import { fetchCategoriesThunk } from '../../features/categories/categoriesThunks';
+import { selectAllCategories } from '../../features/categories/categoriesSelectors';
 
 const Products = () => {
-  const { products, fetchProducts, deleteProduct, toggleAvailability, isLoading } = useProducts();
-  const { categories, fetchCategories } = useCategories();
+  const dispatch = useDispatch();
   
+  // Redux Selectors
+  const products = useSelector(selectAllProducts);
+  const categories = useSelector(selectAllCategories);
+  const isLoading = useSelector(selectProductsLoading);
+  const error = useSelector(selectProductsError);
+
+  // Local state
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
 
   useEffect(() => {
-    fetchProducts();
-    fetchCategories();
-  }, [fetchProducts, fetchCategories]);
+    // Fetch products and categories on component mount
+    dispatch(fetchProductsThunk());
+    dispatch(fetchCategoriesThunk());
+  }, [dispatch]);
 
+  // Clear errors when component unmounts
+  useEffect(() => {
+    return () => {
+      dispatch(clearError());
+    };
+  }, [dispatch]);
+
+  // Filter products based on search, category, and status
   const filteredProducts = products.filter(product => {
-    const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         product.description.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = product.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         product.description?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = !selectedCategory || product.categoryId === parseInt(selectedCategory);
     const matchesStatus = statusFilter === 'all' || 
                          (statusFilter === 'available' && product.isAvailable) ||
@@ -33,14 +63,24 @@ const Products = () => {
 
   const handleDelete = async (productId) => {
     if (window.confirm('Are you sure you want to delete this product?')) {
-      await deleteProduct(productId);
-      fetchProducts(); // Refresh the list
+      try {
+        await dispatch(deleteProductThunk(productId)).unwrap();
+        // No need to refetch - the thunk updates the state
+      } catch (error) {
+        console.error('Failed to delete product:', error);
+        // Error is handled by Redux and will be displayed
+      }
     }
   };
 
   const handleToggleAvailability = async (productId, currentStatus) => {
-    await toggleAvailability(productId);
-    fetchProducts(); // Refresh the list
+    try {
+      await dispatch(toggleAvailabilityThunk(productId)).unwrap();
+      // No need to refetch - the thunk updates the state
+    } catch (error) {
+      console.error('Failed to toggle availability:', error);
+      // Error is handled by Redux and will be displayed
+    }
   };
 
   return (
@@ -60,6 +100,23 @@ const Products = () => {
           <span>+</span> Add Product
         </Link>
       </div>
+
+      {/* Error Display */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <div className="flex items-center">
+            <div className="flex-shrink-0">
+              <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div className="ml-3">
+              <h3 className="text-sm font-medium text-red-800">Error</h3>
+              <p className="text-sm text-red-700 mt-1">{error}</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="bg-white shadow rounded-lg p-4">
@@ -120,6 +177,7 @@ const Products = () => {
         {isLoading ? (
           <div className="flex justify-center items-center py-8">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            <span className="ml-2 text-gray-600">Loading products...</span>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -155,7 +213,15 @@ const Products = () => {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <div className="flex-shrink-0 h-10 w-10 bg-gray-200 rounded-lg flex items-center justify-center text-lg">
-                          {product.image || '📦'}
+                          {product.imageUrl ? (
+                            <img 
+                              src={product.imageUrl} 
+                              alt={product.name}
+                              className="h-10 w-10 object-cover rounded-lg"
+                            />
+                          ) : (
+                            '📦'
+                          )}
                         </div>
                         <div className="ml-4">
                           <div className="text-sm font-medium text-gray-900">
@@ -179,7 +245,7 @@ const Products = () => {
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {product.stockQuantity}
+                      {product.stockQuantity || 0}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
@@ -214,12 +280,14 @@ const Products = () => {
                               ? 'text-orange-600 hover:text-orange-900' 
                               : 'text-green-600 hover:text-green-900'
                           }`}
+                          disabled={isLoading}
                         >
                           {product.isAvailable ? 'Disable' : 'Enable'}
                         </button>
                         <button
                           onClick={() => handleDelete(product.id)}
                           className="text-red-600 hover:text-red-900"
+                          disabled={isLoading}
                         >
                           Delete
                         </button>

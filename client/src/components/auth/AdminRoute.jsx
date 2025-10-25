@@ -3,7 +3,7 @@
 // ============================================
 import { Navigate, useLocation } from 'react-router-dom';
 import { useSelector } from 'react-redux';
-import { selectIsAuthenticated, selectIsLoading } from '../../features/auth/authSelectors'; // ✅ FIXED IMPORT
+import { selectIsAuthenticated, selectIsLoading, selectUser } from '../../features/auth/authSelectors'; // ✅ FIXED IMPORT
 
 const AdminRoute = ({ children }) => {
   const location = useLocation();

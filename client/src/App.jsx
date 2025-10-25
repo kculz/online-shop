@@ -32,9 +32,9 @@ import OrderDetails from "./pages/OrderDetails";
 import Profile from "./pages/Profile";
 
 // Admin Pages
-// import Dashboard from "./pages/admin/Dashboard";
-// import Products from "./pages/admin/Products";
-// import Categories from "./pages/admin/Categories";
+import Dashboard from "./pages/admin/Dashboard";
+import Products from "./pages/admin/Products";
+import Categories from "./pages/admin/Categories";
 // import Orders from "./pages/admin/Orders";
 // import Rentals from "./pages/admin/Rentals";
 // import Users from "./pages/admin/Users";
@@ -159,7 +159,7 @@ function App() {
         </ProtectedRoute>
       } />
 
-      {/* ADMIN ROUTES - Require admin role
+      {/* ADMIN ROUTES - Require admin role */}
       <Route path="/admin" element={
         <AdminRoute>
           <DashboardLayout>
@@ -168,7 +168,7 @@ function App() {
         </AdminRoute>
       } />
 
-      <Route path="/admin/products" element={
+       <Route path="/admin/products" element={
         <AdminRoute>
           <DashboardLayout>
             <Products />
@@ -184,7 +184,7 @@ function App() {
         </AdminRoute>
       } />
 
-      <Route path="/admin/orders" element={
+      {/*<Route path="/admin/orders" element={
         <AdminRoute>
           <DashboardLayout>
             <Orders />

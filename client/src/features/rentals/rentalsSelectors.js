@@ -3,7 +3,7 @@
 // ============================================
 
 import { createSelector } from 'reselect';
-import { rentalUtils } from './rentalAPI';
+import { rentalUtils } from './rentalsAPI';
 
 const selectRental = (state) => state.rental;
 
