@@ -36,7 +36,9 @@ import Dashboard from "./pages/admin/Dashboard";
 import Products from "./pages/admin/Products";
 import Categories from "./pages/admin/Categories";
 import AdminOrders from "./pages/admin/Orders";
-// import Rentals from "./pages/admin/Rentals";
+import AddProduct from "./pages/admin/AddProduct";
+import EditProduct from "./pages/admin/EditProduct";
+import Rentals from "./pages/admin/Rentals";
 // import Users from "./pages/admin/Users";
 // import Payments from "./pages/admin/Payments";
 
@@ -176,6 +178,22 @@ function App() {
         </AdminRoute>
       } />
 
+       <Route path="/admin/products/new" element={
+        <AdminRoute>
+          <DashboardLayout>
+            <AddProduct />
+          </DashboardLayout>
+        </AdminRoute>
+      } />
+
+      <Route path="/admin/products/edit/:id" element={
+        <AdminRoute>
+          <DashboardLayout>
+            <EditProduct />
+          </DashboardLayout>
+        </AdminRoute>
+      } />
+
       <Route path="/admin/categories" element={
         <AdminRoute>
           <DashboardLayout>
@@ -192,7 +210,7 @@ function App() {
         </AdminRoute>
       } />
 
-      {/*<Route path="/admin/rentals" element={
+      <Route path="/admin/rentals" element={
         <AdminRoute>
           <DashboardLayout>
             <Rentals />
@@ -200,7 +218,7 @@ function App() {
         </AdminRoute>
       } />
 
-      <Route path="/admin/users" element={
+      {/*<Route path="/admin/users" element={
         <AdminRoute>
           <DashboardLayout>
             <Users />

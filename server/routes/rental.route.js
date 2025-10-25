@@ -19,4 +19,10 @@ router.post('/:rentalId/return', verifyAdmin, rentalController.processReturn);
 // GET /api/rentals/overdue/check - Check for overdue rentals (admin only)
 router.get('/overdue/check', verifyAdmin, rentalController.checkOverdueRentals);
 
+// DELETE /api/rentals/:rentalId - Delete rental (admin only)
+router.delete('/:rentalId', verifyAdmin, rentalController.deleteRental);
+
+// DELETE /api/rentals/:rentalId/force - Force delete rental (admin only)
+router.delete('/:rentalId/force', verifyAdmin, rentalController.forceDeleteRental);
+
 module.exports = router;

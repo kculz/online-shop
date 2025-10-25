@@ -161,7 +161,7 @@ const Checkout = () => {
 const startPaymentPolling = (paymentIdentifier) => {
   console.log('🔄 [Checkout] Starting payment polling for:', paymentIdentifier);
   
-  const maxPollingTime = 300000; // 5 minutes
+  const maxPollingTime = 10000; // 10 seconds
   const startTime = Date.now();
   
   // Clear any existing interval
@@ -220,7 +220,7 @@ const startPaymentPolling = (paymentIdentifier) => {
     } catch (error) {
       console.error('❌ [Checkout] Polling error:', error);
     }
-  }, 5000); // Poll every 5 seconds
+  }, 3000); // Poll every 3 seconds
 
   dispatch(startPolling(pollIntervalRef.current));
 };

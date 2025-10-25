@@ -1,5 +1,5 @@
 // ============================================
-// pages/admin/Orders.jsx - REDUX VERSION
+// pages/admin/Orders.jsx - FIXED VERSION
 // ============================================
 import React, { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
@@ -48,6 +48,25 @@ const Orders = () => {
       dispatch(clearError());
     };
   }, [dispatch]);
+
+  // Helper function to safely format amounts
+  const formatAmount = (amount) => {
+    if (!amount && amount !== 0) return '0.00';
+    
+    // If it's already a number, format it
+    if (typeof amount === 'number') {
+      return amount.toFixed(2);
+    }
+    
+    // If it's a string that can be converted to a number
+    const numAmount = parseFloat(amount);
+    if (!isNaN(numAmount)) {
+      return numAmount.toFixed(2);
+    }
+    
+    // If it's already formatted or invalid, return as is or default
+    return amount || '0.00';
+  };
 
   // Filter orders based on status and search
   const filteredOrders = orders.filter(order => {
@@ -202,7 +221,7 @@ const Orders = () => {
                       {new Date(order.createdAt).toLocaleDateString()}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      ${order.totalAmount?.toFixed(2) || '0.00'}
+                      ${formatAmount(order.totalAmount)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {order.items?.length || 0} items
@@ -298,14 +317,14 @@ const Orders = () => {
                           {item.isRental && ` • ${item.rentalDays} days`}
                         </p>
                       </div>
-                      <p className="text-sm font-medium">${item.price?.toFixed(2) || '0.00'}</p>
+                      <p className="text-sm font-medium">${formatAmount(item.price)}</p>
                     </div>
                   ))}
                 </div>
               </div>
               
               <div className="flex justify-between items-center pt-4 border-t">
-                <span className="text-lg font-bold">Total: ${selectedOrder.totalAmount?.toFixed(2) || '0.00'}</span>
+                <span className="text-lg font-bold">Total: ${formatAmount(selectedOrder.totalAmount)}</span>
                 <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(selectedOrder.status)}`}>
                   {selectedOrder.status}
                 </span>

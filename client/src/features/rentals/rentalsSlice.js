@@ -1,5 +1,5 @@
 // ============================================
-// Rental Slice (features/rental/rentalSlice.js)
+// features/rental/rentalSlice.js
 // ============================================
 
 import { createSlice } from '@reduxjs/toolkit';
@@ -10,6 +10,8 @@ import {
   checkOverdueRentalsThunk,
   createRentalThunk,
   fetchRentalByIdThunk,
+  deleteRentalThunk,
+  forceDeleteRentalThunk,
 } from './rentalsThunks';
 
 const initialState = {
@@ -20,6 +22,8 @@ const initialState = {
   isLoading: false,
   error: null,
   lastFetch: null,
+  deletingRental: false,
+  deleteError: null,
 };
 
 const rentalSlice = createSlice({
@@ -28,6 +32,7 @@ const rentalSlice = createSlice({
   reducers: {
     clearError: (state) => {
       state.error = null;
+      state.deleteError = null;
     },
     clearCurrentRental: (state) => {
       state.currentRental = null;
@@ -60,6 +65,9 @@ const rentalSlice = createSlice({
       if (state.currentRental?.id === rentalId) {
         state.currentRental = { ...state.currentRental, ...updates };
       }
+    },
+    clearDeleteError: (state) => {
+      state.deleteError = null;
     },
   },
   extraReducers: (builder) => {
@@ -133,9 +141,51 @@ const rentalSlice = createSlice({
       .addCase(fetchRentalByIdThunk.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.payload;
+      })
+      // Delete rental
+      .addCase(deleteRentalThunk.pending, (state) => {
+        state.deletingRental = true;
+        state.deleteError = null;
+      })
+      .addCase(deleteRentalThunk.fulfilled, (state, action) => {
+        state.deletingRental = false;
+        const rentalId = action.payload;
+        state.userRentals = state.userRentals.filter(r => r.id !== rentalId);
+        state.allRentals = state.allRentals.filter(r => r.id !== rentalId);
+        if (state.currentRental?.id === rentalId) {
+          state.currentRental = null;
+        }
+      })
+      .addCase(deleteRentalThunk.rejected, (state, action) => {
+        state.deletingRental = false;
+        state.deleteError = action.payload;
+      })
+      // Force delete rental
+      .addCase(forceDeleteRentalThunk.pending, (state) => {
+        state.deletingRental = true;
+        state.deleteError = null;
+      })
+      .addCase(forceDeleteRentalThunk.fulfilled, (state, action) => {
+        state.deletingRental = false;
+        const rentalId = action.payload;
+        state.userRentals = state.userRentals.filter(r => r.id !== rentalId);
+        state.allRentals = state.allRentals.filter(r => r.id !== rentalId);
+        if (state.currentRental?.id === rentalId) {
+          state.currentRental = null;
+        }
+      })
+      .addCase(forceDeleteRentalThunk.rejected, (state, action) => {
+        state.deletingRental = false;
+        state.deleteError = action.payload;
       });
   },
 });
 
-export const { clearError, clearCurrentRental, clearOverdueRentals, updateRentalStatus } = rentalSlice.actions;
+export const { 
+  clearError, 
+  clearCurrentRental, 
+  clearOverdueRentals, 
+  updateRentalStatus,
+  clearDeleteError 
+} = rentalSlice.actions;
 export default rentalSlice.reducer;

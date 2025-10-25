@@ -37,12 +37,23 @@ export const selectRentalError = createSelector(
   (rental) => rental.error
 );
 
+export const selectRentalDeleting = createSelector(
+  [selectRental],
+  (rental) => rental.deletingRental
+);
+
+export const selectRentalDeleteError = createSelector(
+  [selectRental],
+  (rental) => rental.deleteError
+);
+
 export const selectRentalsWithCalculatedData = createSelector(
   [selectUserRentals],
   (rentals) => rentals.map(rental => ({
     ...rental,
     status: rentalUtils.calculateStatus(rental),
     days: rentalUtils.calculateDays(rental),
+    deletionEligibility: rentalUtils.checkDeletionEligibility(rental),
   }))
 );
 
@@ -52,8 +63,20 @@ export const selectAllRentalsWithCalculatedData = createSelector(
     ...rental,
     status: rentalUtils.calculateStatus(rental),
     days: rentalUtils.calculateDays(rental),
+    deletionEligibility: rentalUtils.checkDeletionEligibility(rental),
   }))
 );
+
+export const selectDeletableRentals = createSelector(
+  [selectAllRentalsWithCalculatedData],
+  (rentals) => rentals.filter(rental => rental.deletionEligibility.canDelete)
+);
+
+export const selectNonDeletableRentals = createSelector(
+  [selectAllRentalsWithCalculatedData],
+  (rentals) => rentals.filter(rental => !rental.deletionEligibility.canDelete)
+);
+
 
 export const selectActiveRentals = createSelector(
   [selectRentalsWithCalculatedData],
@@ -86,6 +109,7 @@ export const selectRentalById = (rentalId) =>
         ...rental,
         status: rentalUtils.calculateStatus(rental),
         days: rentalUtils.calculateDays(rental),
+        deletionEligibility: rentalUtils.checkDeletionEligibility(rental),
       };
     }
   );
@@ -114,6 +138,7 @@ export const selectRentalStats = createSelector(
     const overdueRentals = rentals.filter(r => r.status === 'overdue').length;
     const upcomingRentals = rentals.filter(r => r.status === 'upcoming').length;
     const returnedRentals = rentals.filter(r => r.status === 'returned').length;
+    const deletableRentals = rentals.filter(r => r.deletionEligibility.canDelete).length;
     
     const totalRevenue = rentals.reduce((sum, rental) => sum + (rental.totalAmount || 0), 0);
     const pendingRevenue = rentals
@@ -126,6 +151,7 @@ export const selectRentalStats = createSelector(
       overdueRentals,
       upcomingRentals,
       returnedRentals,
+      deletableRentals,
       totalRevenue,
       pendingRevenue,
     };

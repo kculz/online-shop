@@ -1,5 +1,5 @@
 // ============================================
-// Rental API (features/rental/rentalAPI.js)
+// features/rental/rentalsAPI.js
 // ============================================
 
 import axiosInstance from '../../services/api';
@@ -56,6 +56,24 @@ export const rentalAPI = {
    */
   getRentalById: (rentalId) => {
     return axiosInstance.get(`/rentals/${rentalId}`);
+  },
+
+  /**
+   * Delete rental (admin only)
+   * @param {string|number} rentalId - Rental ID
+   * @returns {Promise<AxiosResponse>} - API response
+   */
+  deleteRental: (rentalId) => {
+    return axiosInstance.delete(`/rentals/${rentalId}`);
+  },
+
+  /**
+   * Force delete rental (admin only - any status)
+   * @param {string|number} rentalId - Rental ID
+   * @returns {Promise<AxiosResponse>} - API response
+   */
+  forceDeleteRental: (rentalId) => {
+    return axiosInstance.delete(`/rentals/${rentalId}/force`);
   },
 };
 
@@ -126,6 +144,24 @@ export const rentalUtils = {
       daysUsed: Math.max(0, daysUsed),
       daysRemaining: Math.max(0, daysRemaining),
       overdueDays,
+    };
+  },
+
+  /**
+   * Check if rental can be deleted
+   * @param {Object} rental - Rental object
+   * @returns {Object} - Deletion eligibility
+   */
+  checkDeletionEligibility: (rental) => {
+    const canDelete = ['returned', 'cancelled', 'upcoming'].includes(rental.status);
+    const message = canDelete 
+      ? 'Rental can be deleted' 
+      : `Cannot delete ${rental.status} rental. Only returned, cancelled, or upcoming rentals can be deleted.`;
+
+    return {
+      canDelete,
+      message,
+      requiresForceDelete: !canDelete
     };
   }
 };

@@ -122,6 +122,67 @@ const RentalController = {
     } catch (error) {
       res.status(500).json({ error: error.message });
     }
+  },
+
+    // Delete rental (admin only)
+  async deleteRental(req, res) {
+    try {
+      const { rentalId } = req.params;
+
+      console.log(`👑 ADMIN: Deleting rental ${rentalId}`);
+
+      const rental = await Rental.findByPk(rentalId);
+      
+      if (!rental) {
+        console.log(`❌ ADMIN: Rental ${rentalId} not found`);
+        return res.status(404).json({ error: 'Rental not found' });
+      }
+
+      // Check if rental can be deleted (only allow deletion of cancelled or returned rentals)
+      if (rental.status === 'active' || rental.status === 'overdue') {
+        console.log(`❌ ADMIN: Cannot delete ${rental.status} rental`);
+        return res.status(400).json({ 
+          error: `Cannot delete ${rental.status} rental. Only cancelled or returned rentals can be deleted.` 
+        });
+      }
+
+      await rental.destroy();
+
+      console.log(`✅ ADMIN: Rental ${rentalId} deleted successfully`);
+      res.status(204).send();
+    } catch (error) {
+      console.error(`❌ ADMIN: Error deleting rental ${req.params.rentalId}:`, error);
+      res.status(500).json({ 
+        error: 'Failed to delete rental',
+        message: error.message 
+      });
+    }
+  },
+
+  // Force delete rental (admin only - for any status)
+  async forceDeleteRental(req, res) {
+    try {
+      const { rentalId } = req.params;
+
+      console.log(`👑 ADMIN: Force deleting rental ${rentalId}`);
+
+      const rental = await Rental.findByPk(rentalId);
+      
+      if (!rental) {
+        return res.status(404).json({ error: 'Rental not found' });
+      }
+
+      await rental.destroy();
+
+      console.log(`✅ ADMIN: Rental ${rentalId} force deleted successfully`);
+      res.status(204).send();
+    } catch (error) {
+      console.error(`❌ ADMIN: Error force deleting rental ${req.params.rentalId}:`, error);
+      res.status(500).json({ 
+        error: 'Failed to force delete rental',
+        message: error.message 
+      });
+    }
   }
 };
 

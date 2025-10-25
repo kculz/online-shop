@@ -1,5 +1,5 @@
 // ============================================
-// Rental Thunks (features/rental/rentalThunks.js)
+// features/rental/rentalsThunks.js
 // ============================================
 
 import { createAsyncThunk } from '@reduxjs/toolkit';
@@ -74,6 +74,40 @@ export const fetchRentalByIdThunk = createAsyncThunk(
       return response.data;
     } catch (error) {
       return rejectWithValue(error.response?.data?.error || 'Failed to fetch rental');
+    }
+  }
+);
+
+export const deleteRentalThunk = createAsyncThunk(
+  'rental/deleteRental',
+  async (rentalId, { rejectWithValue }) => {
+    try {
+      console.log('🔄 [Thunk] Deleting rental:', rentalId);
+      await rentalAPI.deleteRental(rentalId);
+      console.log('✅ [Thunk] Rental deleted successfully');
+      return rentalId;
+    } catch (error) {
+      console.error('❌ [Thunk] Failed to delete rental:', error.response?.data);
+      return rejectWithValue(
+        error.response?.data?.error || 'Failed to delete rental'
+      );
+    }
+  }
+);
+
+export const forceDeleteRentalThunk = createAsyncThunk(
+  'rental/forceDeleteRental',
+  async (rentalId, { rejectWithValue }) => {
+    try {
+      console.log('🔄 [Thunk] Force deleting rental:', rentalId);
+      await rentalAPI.forceDeleteRental(rentalId);
+      console.log('✅ [Thunk] Rental force deleted successfully');
+      return rentalId;
+    } catch (error) {
+      console.error('❌ [Thunk] Failed to force delete rental:', error.response?.data);
+      return rejectWithValue(
+        error.response?.data?.error || 'Failed to force delete rental'
+      );
     }
   }
 );
