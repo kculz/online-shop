@@ -35,7 +35,7 @@ import Profile from "./pages/Profile";
 import Dashboard from "./pages/admin/Dashboard";
 import Products from "./pages/admin/Products";
 import Categories from "./pages/admin/Categories";
-// import Orders from "./pages/admin/Orders";
+import AdminOrders from "./pages/admin/Orders";
 // import Rentals from "./pages/admin/Rentals";
 // import Users from "./pages/admin/Users";
 // import Payments from "./pages/admin/Payments";
@@ -184,15 +184,15 @@ function App() {
         </AdminRoute>
       } />
 
-      {/*<Route path="/admin/orders" element={
+      <Route path="/admin/orders" element={
         <AdminRoute>
           <DashboardLayout>
-            <Orders />
+            <AdminOrders />
           </DashboardLayout>
         </AdminRoute>
       } />
 
-      <Route path="/admin/rentals" element={
+      {/*<Route path="/admin/rentals" element={
         <AdminRoute>
           <DashboardLayout>
             <Rentals />

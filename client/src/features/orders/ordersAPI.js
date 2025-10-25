@@ -107,6 +107,76 @@ export const ordersUtils = {
   },
 
   /**
+   * Get user's orders
+   * @returns {Promise} - API response containing orders data
+   */
+  getOrders: () => {
+    return axiosInstance.get('/orders');
+  },
+
+  /**
+   * Get all orders (admin only)
+   * @returns {Promise} - API response containing all orders
+   */
+  getAllOrders: () => {
+    return axiosInstance.get('/admin/orders');
+  },
+
+  /**
+   * Get specific order by ID
+   * @param {string|number} orderId - Order ID
+   * @returns {Promise} - API response containing order data
+   */
+  getOrder: (orderId) => {
+    return axiosInstance.get(`/orders/${orderId}`);
+  },
+
+  /**
+   * Get order by ID (admin - with full details)
+   * @param {string|number} orderId - Order ID
+   * @returns {Promise} - API response containing order data
+   */
+  getAdminOrder: (orderId) => {
+    return axiosInstance.get(`/admin/orders/${orderId}`);
+  },
+
+  /**
+   * Create new order
+   * @param {Object} orderData - Order data
+   * @returns {Promise} - API response containing created order
+   */
+  createOrder: (orderData) => {
+    return axiosInstance.post('/orders', orderData);
+  },
+
+  /**
+   * Update order status (admin only)
+   * @param {string|number} orderId - Order ID
+   * @param {string} status - New status
+   * @returns {Promise} - API response containing updated order
+   */
+  updateOrderStatus: (orderId, status) => {
+    return axiosInstance.put(`/admin/orders/${orderId}/status`, { status });
+  },
+
+  /**
+   * Delete order (admin only)
+   * @param {string|number} orderId - Order ID
+   * @returns {Promise} - API response
+   */
+  deleteOrder: (orderId) => {
+    return axiosInstance.delete(`/admin/orders/${orderId}`);
+  },
+
+  /**
+   * Get order statistics (admin only)
+   * @returns {Promise} - API response containing order statistics
+   */
+  getOrderStats: () => {
+    return axiosInstance.get('/admin/orders/stats');
+  },
+
+  /**
    * Format date for display
    * @param {string} dateString - Date string
    * @returns {string} - Formatted date

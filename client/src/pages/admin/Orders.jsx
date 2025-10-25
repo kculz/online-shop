@@ -1,26 +1,63 @@
 // ============================================
-// pages/admin/Orders.jsx
+// pages/admin/Orders.jsx - REDUX VERSION
 // ============================================
-import { useState, useEffect } from 'react';
-import { useOrders, useUsers } from '../../stores';
-import { orderSelectors } from '../../stores/selectors/orderSelectors';
-import { userSelectors } from '../../stores/selectors/userSelectors';
+import React, { useState, useEffect } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+
+// Import Redux actions and selectors
+import { 
+  fetchAllOrdersThunk, 
+  updateOrderStatusThunk 
+} from '../../features/orders/ordersThunks';
+import { clearError } from '../../features/orders/ordersSlice';
+import { 
+  selectAllOrders, 
+  selectOrdersLoading, 
+  selectOrdersError,
+  selectOrderStatusUpdating
+} from '../../features/orders/ordersSelectors';
+
+// Import users for customer names
+import { fetchAllUsersThunk } from '../../features/users/usersThunks';
+import { selectAllUsers } from '../../features/users/usersSelectors';
 
 const Orders = () => {
-  const { orders, fetchUserOrders, isLoading } = useOrders();
-  const { users, fetchAllUsers } = useUsers();
+  const dispatch = useDispatch();
   
+  // Redux Selectors
+  const orders = useSelector(selectAllOrders);
+  const users = useSelector(selectAllUsers);
+  const isLoading = useSelector(selectOrdersLoading);
+  const error = useSelector(selectOrdersError);
+  const isUpdatingStatus = useSelector(selectOrderStatusUpdating);
+
+  // Local state
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
-    fetchUserOrders();
-    fetchAllUsers();
-  }, [fetchUserOrders, fetchAllUsers]);
+    // Fetch all orders and users on component mount
+    dispatch(fetchAllOrdersThunk());
+    dispatch(fetchAllUsersThunk());
+  }, [dispatch]);
 
-  const filteredOrders = orders.filter(order => 
-    statusFilter === 'all' || order.status === statusFilter
-  );
+  // Clear errors when component unmounts
+  useEffect(() => {
+    return () => {
+      dispatch(clearError());
+    };
+  }, [dispatch]);
+
+  // Filter orders based on status and search
+  const filteredOrders = orders.filter(order => {
+    const matchesStatus = statusFilter === 'all' || order.status === statusFilter;
+    const matchesSearch = 
+      order.id?.toString().includes(searchTerm) ||
+      getUserName(order.userId)?.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    return matchesStatus && matchesSearch;
+  });
 
   const getUserName = (userId) => {
     const user = users.find(u => u.id === userId);
@@ -30,7 +67,9 @@ const Orders = () => {
   const getStatusColor = (status) => {
     switch (status) {
       case 'pending': return 'bg-yellow-100 text-yellow-800';
-      case 'confirmed': return 'bg-blue-100 text-blue-800';
+      case 'payment_pending': return 'bg-orange-100 text-orange-800';
+      case 'processing': return 'bg-blue-100 text-blue-800';
+      case 'confirmed': return 'bg-green-100 text-green-800';
       case 'shipped': return 'bg-purple-100 text-purple-800';
       case 'delivered': return 'bg-green-100 text-green-800';
       case 'cancelled': return 'bg-red-100 text-red-800';
@@ -38,11 +77,14 @@ const Orders = () => {
     }
   };
 
-  const updateOrderStatus = async (orderId, newStatus) => {
-    // This would call an API to update order status
-    console.log(`Updating order ${orderId} to ${newStatus}`);
-    // await updateOrderStatusAPI(orderId, newStatus);
-    // fetchUserOrders(); // Refresh orders
+  const handleStatusUpdate = async (orderId, newStatus) => {
+    try {
+      await dispatch(updateOrderStatusThunk({ orderId, status: newStatus })).unwrap();
+      // No need to refetch - the thunk updates the state
+    } catch (error) {
+      console.error('Failed to update order status:', error);
+      // Error is handled by Redux and will be displayed
+    }
   };
 
   return (
@@ -55,9 +97,40 @@ const Orders = () => {
         </p>
       </div>
 
+      {/* Error Display */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <div className="flex items-center">
+            <div className="flex-shrink-0">
+              <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div className="ml-3">
+              <h3 className="text-sm font-medium text-red-800">Error</h3>
+              <p className="text-sm text-red-700 mt-1">{error}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Filters */}
       <div className="bg-white shadow rounded-lg p-4">
-        <div className="flex items-center space-x-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div>
+            <label htmlFor="search" className="block text-sm font-medium text-gray-700">
+              Search Orders
+            </label>
+            <input
+              type="text"
+              id="search"
+              placeholder="Search by order ID or customer name..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+            />
+          </div>
+          
           <div>
             <label htmlFor="status" className="block text-sm font-medium text-gray-700">
               Filter by Status
@@ -70,6 +143,8 @@ const Orders = () => {
             >
               <option value="all">All Orders</option>
               <option value="pending">Pending</option>
+              <option value="payment_pending">Payment Pending</option>
+              <option value="processing">Processing</option>
               <option value="confirmed">Confirmed</option>
               <option value="shipped">Shipped</option>
               <option value="delivered">Delivered</option>
@@ -84,6 +159,7 @@ const Orders = () => {
         {isLoading ? (
           <div className="flex justify-center items-center py-8">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            <span className="ml-2 text-gray-600">Loading orders...</span>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -126,7 +202,7 @@ const Orders = () => {
                       {new Date(order.createdAt).toLocaleDateString()}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      ${order.totalAmount.toFixed(2)}
+                      ${order.totalAmount?.toFixed(2) || '0.00'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {order.items?.length || 0} items
@@ -141,15 +217,19 @@ const Orders = () => {
                         <button
                           onClick={() => setSelectedOrder(order)}
                           className="text-blue-600 hover:text-blue-900"
+                          disabled={isUpdatingStatus}
                         >
                           View
                         </button>
                         <select
                           value={order.status}
-                          onChange={(e) => updateOrderStatus(order.id, e.target.value)}
-                          className="text-sm border border-gray-300 rounded-md shadow-sm py-1 px-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                          onChange={(e) => handleStatusUpdate(order.id, e.target.value)}
+                          disabled={isUpdatingStatus}
+                          className="text-sm border border-gray-300 rounded-md shadow-sm py-1 px-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50"
                         >
                           <option value="pending">Pending</option>
+                          <option value="payment_pending">Payment Pending</option>
+                          <option value="processing">Processing</option>
                           <option value="confirmed">Confirmed</option>
                           <option value="shipped">Shipped</option>
                           <option value="delivered">Delivered</option>
@@ -166,7 +246,12 @@ const Orders = () => {
 
         {filteredOrders.length === 0 && !isLoading && (
           <div className="text-center py-8">
-            <p className="text-gray-500">No orders found matching your criteria.</p>
+            <p className="text-gray-500">
+              {searchTerm || statusFilter !== 'all' 
+                ? 'No orders found matching your criteria.' 
+                : 'No orders found.'
+              }
+            </p>
           </div>
         )}
       </div>
@@ -213,14 +298,14 @@ const Orders = () => {
                           {item.isRental && ` • ${item.rentalDays} days`}
                         </p>
                       </div>
-                      <p className="text-sm font-medium">${item.price.toFixed(2)}</p>
+                      <p className="text-sm font-medium">${item.price?.toFixed(2) || '0.00'}</p>
                     </div>
                   ))}
                 </div>
               </div>
               
               <div className="flex justify-between items-center pt-4 border-t">
-                <span className="text-lg font-bold">Total: ${selectedOrder.totalAmount.toFixed(2)}</span>
+                <span className="text-lg font-bold">Total: ${selectedOrder.totalAmount?.toFixed(2) || '0.00'}</span>
                 <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(selectedOrder.status)}`}>
                   {selectedOrder.status}
                 </span>
@@ -229,6 +314,18 @@ const Orders = () => {
           </div>
         </div>
       )}
+
+      {/* Pagination Info */}
+      <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
+        <div className="flex-1 flex justify-between items-center">
+          <div>
+            <p className="text-sm text-gray-700">
+              Showing <span className="font-medium">{filteredOrders.length}</span> of{' '}
+              <span className="font-medium">{orders.length}</span> orders
+            </p>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

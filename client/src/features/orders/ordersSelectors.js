@@ -1,3 +1,4 @@
+// features/orders/ordersSelectors.js
 import { createSelector } from 'reselect';
 
 const selectOrders = (state) => state.orders;
@@ -30,6 +31,12 @@ export const selectOrderCreating = createSelector(
 export const selectOrderCreateError = createSelector(
   [selectOrders],
   (orders) => orders.createError
+);
+
+// ADD THIS MISSING SELECTOR
+export const selectOrderStatusUpdating = createSelector(
+  [selectOrders],
+  (orders) => orders.updatingStatus || false
 );
 
 export const selectPendingOrders = createSelector(
@@ -77,7 +84,7 @@ export const selectOrderStats = createSelector(
   [selectAllOrders],
   (orders) => {
     const total = orders.length;
-    const totalAmount = orders.reduce((sum, order) => sum + parseFloat(order.totalAmount), 0);
+    const totalAmount = orders.reduce((sum, order) => sum + parseFloat(order.totalAmount || 0), 0);
     const pending = orders.filter(order => ['pending', 'payment_pending'].includes(order.status)).length;
     const completed = orders.filter(order => ['confirmed', 'shipped', 'delivered'].includes(order.status)).length;
     

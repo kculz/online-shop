@@ -3,6 +3,7 @@ import {
   fetchOrdersThunk,
   fetchOrderByIdThunk,
   createOrderThunk,
+  updateOrderStatusThunk,
 } from './ordersThunks';
 
 const initialState = {
@@ -60,6 +61,25 @@ const ordersSlice = createSlice({
       })
       .addCase(fetchOrderByIdThunk.rejected, (state, action) => {
         state.loading = false;
+        state.error = action.payload;
+      })
+      .addCase(updateOrderStatusThunk.pending, (state) => {
+        state.updatingStatus = true;
+      })
+      .addCase(updateOrderStatusThunk.fulfilled, (state, action) => {
+        state.updatingStatus = false;
+        // Update the order in the list
+        const index = state.orders.findIndex(order => order.id === action.payload.id);
+        if (index !== -1) {
+          state.orders[index] = action.payload;
+        }
+        // Update current order if it's the one being updated
+        if (state.currentOrder?.id === action.payload.id) {
+          state.currentOrder = action.payload;
+        }
+      })
+      .addCase(updateOrderStatusThunk.rejected, (state, action) => {
+        state.updatingStatus = false;
         state.error = action.payload;
       })
       

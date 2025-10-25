@@ -260,6 +260,227 @@ const OrderController = {
     } catch (error) {
       res.status(500).json({ error: error.message });
     }
+  },
+
+    // ADMIN: Get all orders (with user information)
+  async getAllOrders(req, res) {
+    try {
+      console.log('👑 ADMIN: Fetching all orders');
+      
+      const orders = await Order.findAll({
+        include: [
+          {
+            model: User,
+            as: 'user',
+            attributes: ['id', 'username', 'email']
+          },
+          {
+            model: OrderItem,
+            as: 'items',
+            include: [
+              {
+                model: Product,
+                as: 'product',
+                attributes: ['id', 'name', 'price', 'rentalPricePerDay']
+              }
+            ]
+          }
+        ],
+        order: [['createdAt', 'DESC']]
+      });
+
+      console.log(`✅ ADMIN: Found ${orders.length} orders`);
+      res.json(orders);
+    } catch (error) {
+      console.error('❌ ADMIN: Error fetching orders:', error);
+      res.status(500).json({ 
+        error: 'Failed to fetch orders',
+        message: error.message 
+      });
+    }
+  },
+
+  // ADMIN: Get order by ID (with full details)
+  async getOrderById(req, res) {
+    try {
+      const { id } = req.params;
+      console.log(`👑 ADMIN: Fetching order ${id}`);
+
+      const order = await Order.findByPk(id, {
+        include: [
+          {
+            model: User,
+            as: 'user',
+            attributes: ['id', 'username', 'email', 'firstName', 'lastName']
+          },
+          {
+            model: OrderItem,
+            as: 'items',
+            include: [
+              {
+                model: Product,
+                as: 'product',
+                attributes: ['id', 'name', 'price', 'rentalPricePerDay', 'imageUrl']
+              }
+            ]
+          }
+        ]
+      });
+
+      if (!order) {
+        console.log(`❌ ADMIN: Order ${id} not found`);
+        return res.status(404).json({ error: 'Order not found' });
+      }
+
+      console.log(`✅ ADMIN: Order ${id} fetched successfully`);
+      res.json(order);
+    } catch (error) {
+      console.error(`❌ ADMIN: Error fetching order ${req.params.id}:`, error);
+      res.status(500).json({ 
+        error: 'Failed to fetch order',
+        message: error.message 
+      });
+    }
+  },
+
+  // ADMIN: Update order status
+  async updateOrderStatus(req, res) {
+    try {
+      const { id } = req.params;
+      const { status } = req.body;
+
+      console.log(`👑 ADMIN: Updating order ${id} status to ${status}`);
+
+      // Validate status
+      const validStatuses = ['pending', 'payment_pending', 'processing', 'confirmed', 'shipped', 'delivered', 'cancelled'];
+      if (!validStatuses.includes(status)) {
+        return res.status(400).json({ 
+          error: 'Invalid status',
+          validStatuses 
+        });
+      }
+
+      const order = await Order.findByPk(id);
+      if (!order) {
+        return res.status(404).json({ error: 'Order not found' });
+      }
+
+      // Update order status
+      order.status = status;
+      await order.save();
+
+      console.log(`✅ ADMIN: Order ${id} status updated to ${status}`);
+
+      // Return updated order with relationships
+      const updatedOrder = await Order.findByPk(id, {
+        include: [
+          {
+            model: User,
+            as: 'user',
+            attributes: ['id', 'username', 'email']
+          },
+          {
+            model: OrderItem,
+            as: 'items',
+            include: [
+              {
+                model: Product,
+                as: 'product',
+                attributes: ['id', 'name', 'price', 'rentalPricePerDay']
+              }
+            ]
+          }
+        ]
+      });
+
+      res.json(updatedOrder);
+    } catch (error) {
+      console.error(`❌ ADMIN: Error updating order status for ${req.params.id}:`, error);
+      res.status(500).json({ 
+        error: 'Failed to update order status',
+        message: error.message 
+      });
+    }
+  },
+
+  // ADMIN: Delete order
+  async deleteOrder(req, res) {
+    try {
+      const { id } = req.params;
+      console.log(`👑 ADMIN: Deleting order ${id}`);
+
+      const order = await Order.findByPk(id);
+      if (!order) {
+        return res.status(404).json({ error: 'Order not found' });
+      }
+
+      // First delete order items (due to foreign key constraints)
+      await OrderItem.destroy({ where: { orderId: id } });
+      
+      // Then delete the order
+      await order.destroy();
+
+      console.log(`✅ ADMIN: Order ${id} deleted successfully`);
+      res.status(204).send();
+    } catch (error) {
+      console.error(`❌ ADMIN: Error deleting order ${req.params.id}:`, error);
+      res.status(500).json({ 
+        error: 'Failed to delete order',
+        message: error.message 
+      });
+    }
+  },
+
+  // ADMIN: Get order statistics
+  async getOrderStats(req, res) {
+    try {
+      console.log('👑 ADMIN: Fetching order statistics');
+
+      const totalOrders = await Order.count();
+      const totalRevenue = await Order.sum('totalAmount', {
+        where: { status: ['confirmed', 'shipped', 'delivered'] }
+      });
+      
+      const ordersByStatus = await Order.findAll({
+        attributes: [
+          'status',
+          [sequelize.fn('COUNT', sequelize.col('id')), 'count']
+        ],
+        group: ['status'],
+        raw: true
+      });
+
+      const recentOrders = await Order.findAll({
+        limit: 5,
+        order: [['createdAt', 'DESC']],
+        include: [
+          {
+            model: User,
+            as: 'user',
+            attributes: ['username']
+          }
+        ]
+      });
+
+      const stats = {
+        totalOrders,
+        totalRevenue: totalRevenue || 0,
+        ordersByStatus: ordersByStatus.reduce((acc, item) => {
+          acc[item.status] = parseInt(item.count);
+          return acc;
+        }, {}),
+        recentOrders
+      };
+
+      console.log('✅ ADMIN: Order statistics fetched successfully');
+      res.json(stats);
+    } catch (error) {
+      console.error('❌ ADMIN: Error fetching order statistics:', error);
+      res.status(500).json({ 
+        error: 'Failed to fetch order statistics',
+        message: error.message 
+      });
+    }
   }
 };
 
