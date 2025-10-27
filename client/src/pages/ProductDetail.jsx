@@ -52,10 +52,10 @@ const ProductDetail = () => {
   // Local state
   const [selectedImage, setSelectedImage] = useState(0);
   const [quantity, setQuantity] = useState(1);
-  const [activeTab, setActiveTab] = useState('description');
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [showFullDescription, setShowFullDescription] = useState(false);
   const [addingToCart, setAddingToCart] = useState(false);
+  const [imageErrors, setImageErrors] = useState({});
 
   useEffect(() => {
     // Fetch product when component mounts or id changes
@@ -90,6 +90,28 @@ const ProductDetail = () => {
     return isNaN(numReviews) ? 0 : numReviews;
   };
 
+  // Check if product has valid image URL
+  const hasValidImage = (imageUrl) => {
+    if (!imageUrl) return false;
+    if (typeof imageUrl !== 'string') return false;
+    
+    // Check if it's an emoji or icon (not a URL)
+    if (imageUrl.match(/[\u{1F300}-\u{1F9FF}]/gu)) return false;
+    
+    // Check if it's a valid URL format
+    try {
+      new URL(imageUrl);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  // Handle image error
+  const handleImageError = (productId, imageIndex) => {
+    setImageErrors(prev => ({ ...prev, [`${productId}-${imageIndex}`]: true }));
+  };
+
   // Check if product is in cart
   const isProductInCart = (productId, isForRental = false) => {
     return cartItems.some(item => 
@@ -114,7 +136,7 @@ const ProductDetail = () => {
         isForRental: false,
         priceAtAddition: currentProduct.price,
         productName: currentProduct.name,
-        productImage: currentProduct.image || '📦',
+        productImage: currentProduct.imageUrl || '📦',
         rentalDays: currentProduct.canBeRented ? 7 : undefined
       })).unwrap();
       
@@ -145,7 +167,7 @@ const ProductDetail = () => {
         isForRental: false,
         priceAtAddition: currentProduct.price,
         productName: currentProduct.name,
-        productImage: currentProduct.image || '📦'
+        productImage: currentProduct.imageUrl || '📦'
       })).unwrap();
       
       // Navigate directly to checkout
@@ -183,7 +205,8 @@ const ProductDetail = () => {
 
   const incrementQuantity = () => {
     if (currentProduct) {
-      setQuantity(prev => Math.min(prev + 1, currentProduct.stockCount || 10));
+      const maxQuantity = currentProduct.stockQuantity || currentProduct.stockCount || 10;
+      setQuantity(prev => Math.min(prev + 1, maxQuantity));
     }
   };
 
@@ -203,6 +226,35 @@ const ProductDetail = () => {
       navigator.clipboard.writeText(window.location.href);
       alert('Product link copied to clipboard!');
     }
+  };
+
+  // Render product image
+  const renderProductImage = (imageUrl, productId, imageIndex, isThumbnail = false) => {
+    const hasImage = hasValidImage(imageUrl);
+    const imageError = imageErrors[`${productId}-${imageIndex}`];
+    const showFallback = !hasImage || imageError;
+    
+    const containerClass = isThumbnail 
+      ? 'aspect-square bg-gray-100 rounded-xl flex items-center justify-center text-2xl transition-all'
+      : 'aspect-square bg-gradient-to-br from-gray-100 to-gray-200 rounded-2xl flex items-center justify-center text-8xl group-hover:scale-105 transition-transform duration-300';
+
+    if (showFallback) {
+      return (
+        <div className={containerClass}>
+          {imageUrl || '📦'}
+        </div>
+      );
+    }
+
+    return (
+      <img
+        src={imageUrl}
+        alt={currentProduct?.name || 'Product image'}
+        className={`w-full h-full object-cover ${isThumbnail ? 'rounded-xl' : 'rounded-2xl'} group-hover:scale-105 transition-transform duration-300`}
+        onError={() => handleImageError(productId, imageIndex)}
+        loading="lazy"
+      />
+    );
   };
 
   // Loading state
@@ -271,13 +323,13 @@ const ProductDetail = () => {
     safeRating: getRating(currentProduct.rating),
     safeReviews: getReviewsCount(currentProduct.reviews),
     safeRentalPrice: currentProduct.rentalPricePerDay ? formatPrice(currentProduct.rentalPricePerDay) : null,
-    safeImages: currentProduct.images || ['📦'],
+    safeImages: currentProduct.images || [currentProduct.imageUrl] || ['📦'],
     safeCategory: currentProduct.category?.name || 'Uncategorized',
     safeDescription: currentProduct.description || 'No description available.',
     safeFullDescription: currentProduct.fullDescription || currentProduct.description || 'No detailed description available.',
     safeSpecs: currentProduct.specs || {},
     safeFeatures: currentProduct.features || [],
-    safeStockCount: currentProduct.stockCount || 0,
+    safeStockCount: currentProduct.stockQuantity || currentProduct.stockCount || 10,
     safeWarranty: currentProduct.warranty || 'Standard Warranty',
     safeShipping: currentProduct.shipping || 'Standard Shipping',
     safeReturnPolicy: currentProduct.returnPolicy || 'Standard Return Policy'
@@ -316,8 +368,8 @@ const ProductDetail = () => {
           {/* Product Images */}
           <div className="space-y-4">
             {/* Main Image */}
-            <div className="aspect-square bg-gradient-to-br from-gray-100 to-gray-200 rounded-2xl flex items-center justify-center text-8xl">
-              {product.safeImages[selectedImage]}
+            <div className="group">
+              {renderProductImage(product.safeImages[selectedImage], product.id, selectedImage, false)}
             </div>
             
             {/* Thumbnail Images */}
@@ -326,13 +378,13 @@ const ProductDetail = () => {
                 <button
                   key={index}
                   onClick={() => setSelectedImage(index)}
-                  className={`aspect-square bg-gray-100 rounded-xl flex items-center justify-center text-2xl transition-all ${
+                  className={`group transition-all ${
                     selectedImage === index 
-                      ? 'ring-2 ring-blue-500 ring-offset-2' 
-                      : 'hover:bg-gray-200'
+                      ? 'ring-2 ring-blue-500 ring-offset-2 rounded-xl' 
+                      : 'hover:bg-gray-200 rounded-xl'
                   }`}
                 >
-                  {image}
+                  {renderProductImage(image, product.id, index, true)}
                 </button>
               ))}
             </div>
@@ -441,7 +493,7 @@ const ProductDetail = () => {
                 <button
                   onClick={decrementQuantity}
                   disabled={quantity <= 1}
-                  className="w-10 h-10 rounded-lg border border-gray-300 flex items-center justify-center hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-10 h-10 rounded-lg border border-gray-300 flex items-center justify-center hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   -
                 </button>
@@ -449,12 +501,14 @@ const ProductDetail = () => {
                 <button
                   onClick={incrementQuantity}
                   disabled={quantity >= product.safeStockCount}
-                  className="w-10 h-10 rounded-lg border border-gray-300 flex items-center justify-center hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-10 h-10 rounded-lg border border-gray-300 flex items-center justify-center hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   +
                 </button>
               </div>
-              <span className="text-sm text-gray-500">{product.safeStockCount} available</span>
+              <span className="text-sm text-gray-500">
+                {product.safeStockCount > 0 ? `${product.safeStockCount} available` : 'Limited stock'}
+              </span>
             </div>
 
             {/* Action Buttons */}
@@ -498,15 +552,15 @@ const ProductDetail = () => {
                   onClick={toggleWishlist}
                   className={`px-6 py-4 border-2 rounded-lg transition-colors flex items-center justify-center ${
                     isWishlisted
-                      ? 'border-red-500 text-red-500 bg-red-50'
-                      : 'border-gray-300 text-gray-600 hover:border-gray-400'
+                      ? 'border-red-500 text-red-500 bg-red-50 hover:bg-red-100'
+                      : 'border-gray-300 text-gray-600 hover:border-gray-400 hover:bg-gray-50'
                   }`}
                 >
                   <FaHeart className={isWishlisted ? 'fill-current' : ''} />
                 </button>
                 <button
                   onClick={shareProduct}
-                  className="px-6 py-4 border-2 border-gray-300 text-gray-600 rounded-lg hover:border-gray-400 transition-colors flex items-center justify-center"
+                  className="px-6 py-4 border-2 border-gray-300 text-gray-600 rounded-lg hover:border-gray-400 hover:bg-gray-50 transition-colors flex items-center justify-center"
                 >
                   <FaShare />
                 </button>
@@ -518,78 +572,61 @@ const ProductDetail = () => {
               <div className="text-center">
                 <FaTruck className="text-blue-500 text-xl mx-auto mb-2" />
                 <div className="text-sm font-medium text-gray-900">{product.safeShipping}</div>
+                <div className="text-xs text-gray-500">Free over $75</div>
               </div>
               <div className="text-center">
                 <FaShieldAlt className="text-green-500 text-xl mx-auto mb-2" />
                 <div className="text-sm font-medium text-gray-900">{product.safeWarranty}</div>
+                <div className="text-xs text-gray-500">Warranty</div>
               </div>
               <div className="text-center">
                 <FaUndo className="text-purple-500 text-xl mx-auto mb-2" />
                 <div className="text-sm font-medium text-gray-900">{product.safeReturnPolicy}</div>
+                <div className="text-xs text-gray-500">Easy returns</div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Product Details Tabs */}
-        <div className="bg-white rounded-2xl shadow-sm">
-          {/* Tab Headers */}
-          <div className="border-b border-gray-200">
-            <div className="flex overflow-x-auto">
-              {[
-                { id: 'description', label: 'Description' },
-                { id: 'specs', label: 'Specifications' },
-                { id: 'features', label: 'Features' },
-                { id: 'reviews', label: `Reviews (${product.safeReviews})` }
-              ].map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`px-6 py-4 font-medium border-b-2 transition-colors whitespace-nowrap ${
-                    activeTab === tab.id
-                      ? 'border-blue-500 text-blue-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700'
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
+        {/* Product Description Section */}
+        <div className="bg-white rounded-2xl shadow-sm p-8">
+          <h2 className="text-2xl font-bold text-gray-900 mb-6">Product Description</h2>
+          <div className="space-y-4">
+            <div className={`${!showFullDescription && product.safeFullDescription.length > 200 ? 'max-h-32 overflow-hidden' : ''}`}>
+              <p className="text-gray-600 leading-relaxed whitespace-pre-line">
+                {showFullDescription ? product.safeFullDescription : product.safeFullDescription}
+              </p>
             </div>
+            {product.safeFullDescription.length > 200 && (
+              <button
+                onClick={() => setShowFullDescription(!showFullDescription)}
+                className="flex items-center gap-2 text-blue-600 hover:text-blue-700 font-medium"
+              >
+                {showFullDescription ? <FaChevronUp /> : <FaChevronDown />}
+                {showFullDescription ? 'Show Less' : 'Read More'}
+              </button>
+            )}
           </div>
 
-          {/* Tab Content */}
-          <div className="p-8">
-            {activeTab === 'description' && (
-              <div className="space-y-4">
-                <div className={`${!showFullDescription ? 'max-h-32 overflow-hidden' : ''}`}>
-                  <p className="text-gray-600 leading-relaxed whitespace-pre-line">
-                    {showFullDescription ? product.safeFullDescription : product.safeFullDescription.split('\n')[0]}
-                  </p>
-                </div>
-                {product.safeFullDescription.split('\n').length > 1 && (
-                  <button
-                    onClick={() => setShowFullDescription(!showFullDescription)}
-                    className="flex items-center gap-2 text-blue-600 hover:text-blue-700 font-medium"
-                  >
-                    {showFullDescription ? <FaChevronUp /> : <FaChevronDown />}
-                    {showFullDescription ? 'Show Less' : 'Read More'}
-                  </button>
-                )}
-              </div>
-            )}
-
-            {activeTab === 'specs' && (
-              <div className="grid md:grid-cols-2 gap-6">
-                {Object.entries(product.safeSpecs).map(([key, value]) => (
-                  <div key={key} className="flex justify-between py-3 border-b border-gray-100">
+          {/* Display Key Specifications if available */}
+          {Object.keys(product.safeSpecs).length > 0 && (
+            <div className="mt-8">
+              <h3 className="text-xl font-semibold text-gray-900 mb-4">Key Specifications</h3>
+              <div className="grid md:grid-cols-2 gap-4">
+                {Object.entries(product.safeSpecs).slice(0, 6).map(([key, value]) => (
+                  <div key={key} className="flex justify-between py-2 border-b border-gray-100">
                     <span className="font-medium text-gray-600">{key}</span>
                     <span className="text-gray-900 text-right">{value}</span>
                   </div>
                 ))}
               </div>
-            )}
+            </div>
+          )}
 
-            {activeTab === 'features' && (
+          {/* Display Features if available */}
+          {product.safeFeatures.length > 0 && (
+            <div className="mt-8">
+              <h3 className="text-xl font-semibold text-gray-900 mb-4">Key Features</h3>
               <div className="grid md:grid-cols-2 gap-4">
                 {product.safeFeatures.map((feature, index) => (
                   <div key={index} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
@@ -598,25 +635,8 @@ const ProductDetail = () => {
                   </div>
                 ))}
               </div>
-            )}
-
-            {activeTab === 'reviews' && (
-              <div className="space-y-6">
-                <div className="text-center py-8">
-                  <div className="text-6xl mb-4">⭐</div>
-                  <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                    Customer Reviews
-                  </h3>
-                  <p className="text-gray-600">
-                    Read what {product.safeReviews} customers are saying about this product
-                  </p>
-                  <button className="mt-4 bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors">
-                    Write a Review
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
 
         {/* Rental CTA Section */}

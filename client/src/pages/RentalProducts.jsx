@@ -53,6 +53,7 @@ const RentalProducts = () => {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [addingToCart, setAddingToCart] = useState({});
   const [wishlistItems, setWishlistItems] = useState(new Set());
+  const [imageErrors, setImageErrors] = useState({});
 
   // Fetch rental products on component mount
   useEffect(() => {
@@ -78,6 +79,28 @@ const RentalProducts = () => {
     if (reviews === null || reviews === undefined) return 0;
     const numReviews = typeof reviews === 'string' ? parseInt(reviews) : reviews;
     return isNaN(numReviews) ? 0 : numReviews;
+  };
+
+  // Check if product has valid image URL
+  const hasValidImage = (imageUrl) => {
+    if (!imageUrl) return false;
+    if (typeof imageUrl !== 'string') return false;
+    
+    // Check if it's an emoji or icon (not a URL)
+    if (imageUrl.match(/[\u{1F300}-\u{1F9FF}]/gu)) return false;
+    
+    // Check if it's a valid URL format
+    try {
+      new URL(imageUrl);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  // Handle image error
+  const handleImageError = (productId) => {
+    setImageErrors(prev => ({ ...prev, [productId]: true }));
   };
 
   // Check if product is in cart
@@ -119,7 +142,7 @@ const RentalProducts = () => {
         isForRental: true,
         priceAtAddition: rentalPrice,
         productName: product.name,
-        productImage: product.image || '📦',
+        productImage: product.imageUrl || '📦',
         rentalDays: rentalDays,
         rentalDuration: duration
       })).unwrap();
@@ -171,6 +194,31 @@ const RentalProducts = () => {
       default:
         return product.rentalPricePerDay || product.price * 0.1;
     }
+  };
+
+  // Render product image
+  const renderProductImage = (product) => {
+    const hasImage = hasValidImage(product.imageUrl);
+    const imageError = imageErrors[product.id];
+    const showFallback = !hasImage || imageError;
+    
+    if (showFallback) {
+      return (
+        <div className="aspect-square bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center text-6xl cursor-pointer">
+          {product.imageUrl || '📦'}
+        </div>
+      );
+    }
+
+    return (
+      <img
+        src={product.imageUrl}
+        alt={product.name}
+        className="aspect-square w-full object-cover cursor-pointer"
+        onError={() => handleImageError(product.id)}
+        loading="lazy"
+      />
+    );
   };
 
   // Filter products by category
@@ -382,13 +430,15 @@ const RentalProducts = () => {
                   ...product,
                   safeRating: getRating(product.rating),
                   safeReviews: getReviewsCount(product.reviews),
-                  safeImage: product.image || '📦',
+                  safeImage: product.imageUrl || '📦',
                   safeCategory: product.category?.name || 'Uncategorized',
                   safeDescription: product.description || 'Premium tech equipment available for rent',
                   safeRentalPrice: product.rentalPricePerDay ? formatPrice(product.rentalPricePerDay) : formatPrice(product.price * 0.1),
                   safeDeposit: product.rentalDeposit ? formatPrice(product.rentalDeposit) : '500.00',
                   inCart: isProductInCart(product.id, true),
-                  inWishlist: isProductInWishlist(product.id)
+                  inWishlist: isProductInWishlist(product.id),
+                  hasImage: hasValidImage(product.imageUrl),
+                  imageError: imageErrors[product.id]
                 };
 
                 const currentDuration = selectedDuration[product.id] || 'monthly';
@@ -403,10 +453,10 @@ const RentalProducts = () => {
                       {/* Product Image */}
                       <div className="md:w-1/3 relative">
                         <div 
-                          className="aspect-square bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center text-6xl cursor-pointer"
+                          className="cursor-pointer"
                           onClick={(e) => handleQuickView(product.id, e)}
                         >
-                          {safeProduct.safeImage}
+                          {renderProductImage(product)}
                         </div>
                         {product.badge && (
                           <div className="absolute top-4 left-4">

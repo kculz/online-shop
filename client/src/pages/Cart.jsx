@@ -46,7 +46,8 @@ const Cart = () => {
   const [appliedCoupon, setAppliedCoupon] = useState(null);
   const [savedItems, setSavedItems] = useState([]);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
-  const [updatingItems, setUpdatingItems] = useState(new Set()); // Track items being updated
+  const [updatingItems, setUpdatingItems] = useState(new Set());
+  const [imageErrors, setImageErrors] = useState({});
 
   // ✅ CORRECT: Fetch cart only once on mount
   useEffect(() => {
@@ -87,6 +88,77 @@ const Cart = () => {
     const numValue = typeof value === 'string' ? parseFloat(value) : value;
     return isNaN(numValue) ? 0 : numValue;
   }, []);
+
+  // Check if product has valid image URL
+  const hasValidImage = useCallback((imageUrl) => {
+    if (!imageUrl) return false;
+    if (typeof imageUrl !== 'string') return false;
+    
+    // Check if it's an emoji or icon (not a URL)
+    if (imageUrl.match(/[\u{1F300}-\u{1F9FF}]/gu)) return false;
+    
+    // Check if it's a valid URL format
+    try {
+      new URL(imageUrl);
+      return true;
+    } catch {
+      return false;
+    }
+  }, []);
+
+  // Handle image error
+  const handleImageError = useCallback((itemId) => {
+    setImageErrors(prev => ({ ...prev, [itemId]: true }));
+  }, []);
+
+  // Truncate description
+  const truncateDescription = useCallback((text, maxLength = 80) => {
+    if (!text || text.length <= maxLength) return text;
+    return text.substring(0, maxLength) + '...';
+  }, []);
+
+  // Get product data from cart item - FIXED: Access nested product data
+  const getProductData = useCallback((item) => {
+    // Your backend returns: item.product.name, item.product.description, etc.
+    const product = item.product || {};
+    
+    return {
+      name: product.name || 'Unnamed Product',
+      description: product.description || '',
+      imageUrl: product.imageUrl || '📦',
+      category: product.category?.name || '',
+      isAvailable: product.isAvailable !== false,
+      canBeRented: product.canBeRented || false,
+      price: product.price || 0,
+      rentalPricePerDay: product.rentalPricePerDay || 0
+    };
+  }, []);
+
+  // Render product image
+  const renderProductImage = useCallback((item) => {
+    const productData = getProductData(item);
+    const hasImage = hasValidImage(productData.imageUrl);
+    const imageError = imageErrors[item.id];
+    const showFallback = !hasImage || imageError;
+    
+    if (showFallback) {
+      return (
+        <div className="w-20 h-20 bg-gradient-to-br from-gray-100 to-gray-200 rounded-lg flex items-center justify-center text-2xl flex-shrink-0">
+          {productData.imageUrl}
+        </div>
+      );
+    }
+
+    return (
+      <img
+        src={productData.imageUrl}
+        alt={productData.name}
+        className="w-20 h-20 object-cover rounded-lg"
+        onError={() => handleImageError(item.id)}
+        loading="lazy"
+      />
+    );
+  }, [getProductData, hasValidImage, imageErrors, handleImageError]);
 
   // ✅ FIXED: Optimistic quantity updates with immediate UI feedback
   const handleIncrementQuantity = useCallback(async (itemId, currentQuantity) => {
@@ -211,10 +283,10 @@ const Cart = () => {
     navigate('/checkout');
   }, [isAuthenticated, cartItems.length, navigate]);
 
-  // Calculate totals
+  // Calculate totals - FIXED: Use priceAtAddition from cart item
   const { subtotal, discount, shipping, tax, total } = useMemo(() => {
     const subtotalVal = cartItems.reduce((sum, item) => {
-      const price = safeNumber(item.priceAtAddition);
+      const price = safeNumber(item.priceAtAddition); // Use the price when added to cart
       const quantity = safeNumber(item.quantity);
       return sum + (price * quantity);
     }, 0);
@@ -235,7 +307,11 @@ const Cart = () => {
 
   // Debug: Log cart items for troubleshooting
   useEffect(() => {
-    console.log('🛒 Cart Items:', cartItems);
+    console.log('🛒 Cart Items Structure:', cartItems);
+    if (cartItems.length > 0) {
+      console.log('📦 Sample Cart Item:', cartItems[0]);
+      console.log('🔍 Product Data:', cartItems[0]?.product);
+    }
   }, [cartItems]);
 
   // Loading state
@@ -356,41 +432,70 @@ const Cart = () => {
               
               <div className="space-y-4">
                 {cartItems.map((item) => {
-                  const itemPrice = safeNumber(item.priceAtAddition);
+                  const productData = getProductData(item);
+                  const itemPrice = safeNumber(item.priceAtAddition); // Use cart item price
                   const itemQuantity = safeNumber(item.quantity);
                   const itemTotal = itemPrice * itemQuantity;
                   const isUpdating = updatingItems.has(item.id);
                   
                   return (
-                    <div key={item.id} className="border border-gray-200 rounded-xl p-4 hover:border-blue-300 transition-all">
+                    <div key={item.id} className="border border-gray-200 rounded-xl p-4 hover:border-blue-300 transition-all group">
                       <div className="flex gap-4">
                         {/* Product Image */}
-                        <div className="w-24 h-24 bg-gray-100 rounded-lg flex items-center justify-center text-4xl flex-shrink-0">
-                          {item.productImage || '📦'}
+                        <div className="flex-shrink-0">
+                          {renderProductImage(item)}
                         </div>
 
                         {/* Product Details */}
-                        <div className="flex-1">
-                          <div className="flex justify-between mb-2">
-                            <div>
-                              <h3 className="font-semibold text-gray-900 mb-1">{item.productName || 'Product'}</h3>
-                              {item.isForRental && (
-                                <p className="text-xs text-blue-600 font-medium">
-                                  🗓️ Rental: {item.rentalDays || 7} days
+                        <div className="flex-1 min-w-0">
+                          <div className="flex justify-between mb-3">
+                            <div className="min-w-0 flex-1">
+                              <h3 className="font-semibold text-gray-900 text-lg mb-1 truncate">
+                                {productData.name}
+                              </h3>
+                              
+                              {/* Product Description */}
+                              {productData.description && (
+                                <p className="text-sm text-gray-600 mb-2 line-clamp-2">
+                                  {truncateDescription(productData.description, 100)}
                                 </p>
                               )}
-                              <p className="text-xs text-green-600 font-medium">✓ In Stock</p>
+                              
+                              {/* Product Metadata */}
+                              <div className="flex flex-wrap gap-2 mb-2">
+                                {item.isForRental && (
+                                  <span className="inline-flex items-center px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">
+                                    🗓️ Rental: {item.rentalDays || 7} days
+                                  </span>
+                                )}
+                                <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                                  productData.isAvailable 
+                                    ? 'bg-green-100 text-green-800' 
+                                    : 'bg-red-100 text-red-800'
+                                }`}>
+                                  {productData.isAvailable ? '✓ In Stock' : '✗ Out of Stock'}
+                                </span>
+                                {productData.category && (
+                                  <span className="inline-flex items-center px-2 py-1 bg-gray-100 text-gray-800 rounded-full text-xs font-medium">
+                                    {productData.category}
+                                  </span>
+                                )}
+                              </div>
                             </div>
-                            <div className="text-right">
+                            
+                            {/* Price */}
+                            <div className="text-right flex-shrink-0 ml-4">
                               <p className="text-xl font-bold text-blue-600">${formatPrice(itemPrice)}</p>
-                              <p className="text-sm text-gray-500">{item.isForRental ? 'per rental' : 'each'}</p>
+                              <p className="text-sm text-gray-500">
+                                {item.isForRental ? `for ${item.rentalDays || 7} days` : 'each'}
+                              </p>
                             </div>
                           </div>
 
                           {/* Actions */}
-                          <div className="flex items-center justify-between mt-4">
+                          <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-100">
                             {/* Quantity Control */}
-                            <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-4">
                               <div className="flex items-center gap-2 bg-gray-100 rounded-lg border border-gray-300">
                                 <button
                                   onClick={() => handleDecrementQuantity(item.id, itemQuantity)}
@@ -408,7 +513,7 @@ const Cart = () => {
                                 </span>
                                 <button
                                   onClick={() => handleIncrementQuantity(item.id, itemQuantity)}
-                                  disabled={isUpdating}
+                                  disabled={isUpdating || !productData.isAvailable}
                                   className="p-2 hover:bg-gray-200 transition-colors rounded-r-lg disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                   {isUpdating ? (
@@ -418,7 +523,7 @@ const Cart = () => {
                                   )}
                                 </button>
                               </div>
-                              <p className="text-sm text-gray-600">
+                              <p className="text-sm text-gray-600 hidden sm:block">
                                 Subtotal: <span className="font-bold text-gray-900">${formatPrice(itemTotal)}</span>
                               </p>
                             </div>
@@ -428,20 +533,33 @@ const Cart = () => {
                               <button
                                 onClick={() => handleSaveForLater(item)}
                                 disabled={isUpdating}
-                                className="p-2 text-gray-600 hover:text-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="p-2 text-gray-600 hover:text-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed group relative"
                                 title="Save for later"
                               >
                                 <FaHeart />
+                                <span className="absolute -top-8 -left-2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                                  Save for later
+                                </span>
                               </button>
                               <button
                                 onClick={() => handleRemoveItem(item.id)}
                                 disabled={isUpdating}
-                                className="p-2 text-gray-600 hover:text-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                title="Remove"
+                                className="p-2 text-gray-600 hover:text-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed group relative"
+                                title="Remove from cart"
                               >
                                 <FaTrash />
+                                <span className="absolute -top-8 -left-2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                                  Remove item
+                                </span>
                               </button>
                             </div>
+                          </div>
+                          
+                          {/* Mobile Subtotal */}
+                          <div className="sm:hidden mt-3 pt-3 border-t border-gray-100">
+                            <p className="text-sm text-gray-600">
+                              Subtotal: <span className="font-bold text-gray-900">${formatPrice(itemTotal)}</span>
+                            </p>
                           </div>
                         </div>
                       </div>
@@ -489,7 +607,7 @@ const Cart = () => {
               {/* Price Breakdown */}
               <div className="space-y-3 mb-6 pb-6 border-b">
                 <div className="flex justify-between text-gray-600">
-                  <span>Subtotal</span>
+                  <span>Subtotal ({cartItemCount} items)</span>
                   <span className="font-semibold">${formatPrice(subtotal)}</span>
                 </div>
                 {appliedCoupon && (
@@ -523,7 +641,7 @@ const Cart = () => {
 
               <button 
                 onClick={handleProceedToCheckout}
-                disabled={isLoading}
+                disabled={isLoading || cartItems.some(item => !getProductData(item).isAvailable)}
                 className="w-full bg-blue-600 text-white py-4 rounded-lg font-semibold hover:bg-blue-700 transition-all shadow-lg transform hover:scale-[1.02] flex items-center justify-center gap-2 mb-4 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isLoading ? (

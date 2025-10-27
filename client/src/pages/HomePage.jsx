@@ -7,7 +7,8 @@ import { useDispatch, useSelector } from 'react-redux';
 import { 
   FaLaptop, FaStar, FaShoppingCart, FaHeart, FaArrowRight,
   FaTruck, FaShieldAlt, FaPhoneAlt, FaTools, FaFire,
-  FaCalendarAlt, FaCheck, FaChevronLeft, FaChevronRight
+  FaCalendarAlt, FaCheck, FaChevronLeft, FaChevronRight,
+  FaImage
 } from 'react-icons/fa';
 
 // Import Redux actions and selectors
@@ -50,6 +51,7 @@ const HomePage = () => {
   const [currentHeroSlide, setCurrentHeroSlide] = useState(0);
   const [addingToCart, setAddingToCart] = useState({});
   const [wishlistItems, setWishlistItems] = useState(new Set());
+  const [imageErrors, setImageErrors] = useState({});
 
   // Hero slides data (keep as mock since it's UI-only)
   const heroSlides = useMemo(() => [
@@ -127,6 +129,15 @@ const HomePage = () => {
     dispatch(fetchCategoriesThunk());
   }, [dispatch]);
 
+  // Debug product data
+  useEffect(() => {
+    if (products && products.length > 0) {
+      console.log('Sample product data:', products[0]);
+      console.log('Image URL field:', products[0].imageUrl);
+      console.log('Image field:', products[0].image);
+    }
+  }, [products]);
+
   // Navigation handlers
   const nextHeroSlide = useCallback(() => {
     setCurrentHeroSlide((prev) => (prev + 1) % heroSlides.length);
@@ -153,6 +164,28 @@ const HomePage = () => {
     if (reviews === null || reviews === undefined) return 0;
     const numReviews = typeof reviews === 'string' ? parseInt(reviews) : reviews;
     return isNaN(numReviews) ? 0 : numReviews;
+  }, []);
+
+  // Check if product has valid image URL
+  const hasValidImage = useCallback((imageUrl) => {
+    if (!imageUrl) return false;
+    if (typeof imageUrl !== 'string') return false;
+    
+    // Check if it's an emoji or icon (not a URL)
+    if (imageUrl.match(/[\u{1F300}-\u{1F9FF}]/gu)) return false;
+    
+    // Check if it's a valid URL format
+    try {
+      new URL(imageUrl);
+      return true;
+    } catch {
+      return false;
+    }
+  }, []);
+
+  // Handle image error
+  const handleImageError = useCallback((productId) => {
+    setImageErrors(prev => ({ ...prev, [productId]: true }));
   }, []);
 
   // Check if product is in cart
@@ -191,7 +224,7 @@ const HomePage = () => {
         isForRental: false,
         priceAtAddition: product.price,
         productName: product.name,
-        productImage: product.image || '📦'
+        productImage: product.imageUrl || '📦'
       })).unwrap();
     } catch (error) {
       console.error('Failed to add to cart:', error);
@@ -252,14 +285,16 @@ const HomePage = () => {
         safeRating: getRating(product.rating),
         safeReviews: getReviewsCount(product.reviews),
         safeOriginalPrice: product.originalPrice ? formatPrice(product.originalPrice) : null,
-        safeImage: product.image || '📦',
+        safeImage: product.imageUrl || '📦',
         safeCategory: product.category?.name || 'Tech',
         safeName: product.name || 'Unnamed Product',
         safeDescription: product.description || 'Premium tech product',
         inCart: isProductInCart(product.id, false),
-        inWishlist: isProductInWishlist(product.id)
+        inWishlist: isProductInWishlist(product.id),
+        hasImage: hasValidImage(product.imageUrl),
+        imageError: imageErrors[product.id] || false
       }));
-  }, [products, formatPrice, getRating, getReviewsCount, isProductInCart, isProductInWishlist]);
+  }, [products, formatPrice, getRating, getReviewsCount, isProductInCart, isProductInWishlist, hasValidImage, imageErrors]);
 
   // Get rental products (first 4 available)
   const displayRentalProducts = useMemo(() => {
@@ -272,17 +307,65 @@ const HomePage = () => {
         safeRating: getRating(product.rating),
         safeReviews: getReviewsCount(product.reviews),
         safeDeposit: product.rentalDeposit ? formatPrice(product.rentalDeposit) : '500.00',
-        safeImage: product.image || '📦',
+        safeImage: product.imageUrl || '📦',
         safeCategory: product.category?.name || 'Tech',
         safeName: product.name || 'Rental Product',
         safeDescription: product.description || 'Premium tech equipment available for rent',
         inCart: isProductInCart(product.id, true),
-        inWishlist: isProductInWishlist(product.id)
+        inWishlist: isProductInWishlist(product.id),
+        hasImage: hasValidImage(product.imageUrl),
+        imageError: imageErrors[product.id] || false
       }));
-  }, [rentalProducts, formatPrice, getRating, getReviewsCount, isProductInCart, isProductInWishlist]);
+  }, [rentalProducts, formatPrice, getRating, getReviewsCount, isProductInCart, isProductInWishlist, hasValidImage, imageErrors]);
 
   // Check if still loading
   const isLoading = productsLoading || cartLoading;
+
+  // Render product image component
+  const renderProductImage = useCallback((product) => {
+    const showFallback = !product.hasImage || product.imageError;
+    
+    if (showFallback) {
+      return (
+        <div className="aspect-square bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center text-5xl group-hover:scale-105 transition-transform duration-300">
+          {product.safeImage}
+        </div>
+      );
+    }
+
+    return (
+      <img
+        src={product.imageUrl}
+        alt={product.safeName}
+        className="aspect-square w-full object-cover group-hover:scale-105 transition-transform duration-300"
+        onError={() => handleImageError(product.id)}
+        loading="lazy"
+      />
+    );
+  }, [handleImageError]);
+
+  // Render rental product image component
+  const renderRentalProductImage = useCallback((product) => {
+    const showFallback = !product.hasImage || product.imageError;
+    
+    if (showFallback) {
+      return (
+        <div className="aspect-square bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center text-5xl group-hover:scale-105 transition-transform duration-300">
+          {product.safeImage}
+        </div>
+      );
+    }
+
+    return (
+      <img
+        src={product.imageUrl}
+        alt={product.safeName}
+        className="aspect-square w-full object-cover group-hover:scale-105 transition-transform duration-300"
+        onError={() => handleImageError(product.id)}
+        loading="lazy"
+      />
+    );
+  }, [handleImageError]);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -461,9 +544,7 @@ const HomePage = () => {
                     onClick={(e) => handleQuickView(product.id, e)}
                   >
                     <div className="relative">
-                      <div className="aspect-square bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center text-5xl group-hover:scale-105 transition-transform duration-300">
-                        {product.safeImage}
-                      </div>
+                      {renderRentalProductImage(product)}
                       <div className="absolute top-3 right-3">
                         <span className="px-2 py-1 bg-green-500 text-white rounded-full text-xs font-semibold">
                           {product.isAvailable ? 'Available' : 'Limited'}
@@ -576,9 +657,7 @@ const HomePage = () => {
                     onClick={(e) => handleQuickView(product.id, e)}
                   >
                     <div className="relative">
-                      <div className="aspect-square bg-gray-100 flex items-center justify-center text-6xl group-hover:scale-105 transition-transform duration-300">
-                        {product.safeImage}
-                      </div>
+                      {renderProductImage(product)}
                       <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
                         <button 
                           onClick={(e) => handleAddToWishlist(product.id, e)}
