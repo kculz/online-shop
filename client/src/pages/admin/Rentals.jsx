@@ -1,5 +1,5 @@
 // ============================================
-// pages/admin/Rentals.jsx - REDUX VERSION
+// pages/admin/Rentals.jsx - REDUX VERSION (FIXED)
 // ============================================
 import React, { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
@@ -18,19 +18,11 @@ import {
   selectRentalError 
 } from '../../features/rentals/rentalsSelectors';
 
-// Import users and products for data
-import { fetchAllUsersThunk } from '../../features/users/usersThunks';
-import { fetchProductsThunk } from '../../features/products/productsThunks';
-import { selectAllUsers } from '../../features/users/usersSelectors';
-import { selectAllProducts } from '../../features/products/productsSelectors';
-
 const Rentals = () => {
   const dispatch = useDispatch();
   
   // Redux Selectors
   const rentals = useSelector(selectAllRentalsWithCalculatedData);
-  const users = useSelector(selectAllUsers);
-  const products = useSelector(selectAllProducts);
   const isLoading = useSelector(selectRentalLoading);
   const error = useSelector(selectRentalError);
 
@@ -48,8 +40,6 @@ const Rentals = () => {
   useEffect(() => {
     // Fetch all data on component mount
     dispatch(fetchAllRentalsThunk());
-    dispatch(fetchAllUsersThunk());
-    dispatch(fetchProductsThunk());
   }, [dispatch]);
 
   // Clear errors when component unmounts
@@ -75,26 +65,48 @@ const Rentals = () => {
     return amount || '0.00';
   };
 
+  // FIXED: Get user name from nested orderItem data
+  const getUserName = (rental) => {
+    return rental.orderItem?.order?.user?.username || 
+           rental.orderItem?.order?.userId || 
+           'Unknown User';
+  };
+
+  // FIXED: Get product name from nested orderItem data
+  const getProductName = (rental) => {
+    return rental.orderItem?.product?.name || 
+           'Unknown Product';
+  };
+
+  // FIXED: Get total amount from nested orderItem data
+  const getTotalAmount = (rental) => {
+    return rental.orderItem?.price || 
+           rental.totalAmount || 
+           0;
+  };
+
+  // FIXED: Get user ID from nested data
+  const getUserId = (rental) => {
+    return rental.orderItem?.order?.userId || 
+           rental.userId;
+  };
+
+  // FIXED: Get product ID from nested data
+  const getProductId = (rental) => {
+    return rental.orderItem?.productId || 
+           rental.productId;
+  };
+
   // Filter rentals based on status and search
   const filteredRentals = rentals.filter(rental => {
     const matchesStatus = statusFilter === 'all' || rental.status === statusFilter;
     const matchesSearch = 
       rental.id?.toString().includes(searchTerm) ||
-      getUserName(rental.userId)?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      getProductName(rental.productId)?.toLowerCase().includes(searchTerm.toLowerCase());
+      getUserName(rental)?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      getProductName(rental)?.toLowerCase().includes(searchTerm.toLowerCase());
     
     return matchesStatus && matchesSearch;
   });
-
-  const getUserName = (userId) => {
-    const user = users.find(u => u.id === userId);
-    return user ? user.username : 'Unknown User';
-  };
-
-  const getProductName = (productId) => {
-    const product = products.find(p => p.id === productId);
-    return product ? product.name : 'Unknown Product';
-  };
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -161,6 +173,15 @@ const Rentals = () => {
     const days = Math.ceil((end - start) / (1000 * 60 * 60 * 24));
     return days;
   };
+
+  // Debug: Log rental data structure
+  useEffect(() => {
+    if (rentals.length > 0) {
+      console.log('📋 Sample Rental Data:', rentals[0]);
+      console.log('👤 User Data:', rentals[0]?.orderItem?.order?.user);
+      console.log('📦 Product Data:', rentals[0]?.orderItem?.product);
+    }
+  }, [rentals]);
 
   return (
     <div className="space-y-6">
@@ -281,10 +302,10 @@ const Rentals = () => {
                       #{rental.id}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {getUserName(rental.userId)}
+                      {getUserName(rental)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {getProductName(rental.productId)}
+                      {getProductName(rental)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       <div>
@@ -306,7 +327,7 @@ const Rentals = () => {
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      ${formatAmount(rental.totalAmount)}
+                      ${formatAmount(getTotalAmount(rental))}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex space-x-2">
@@ -376,13 +397,13 @@ const Rentals = () => {
                 <div>
                   <h4 className="font-medium text-gray-700">Customer</h4>
                   <p className="text-sm text-gray-600">
-                    {getUserName(selectedRental.userId)}
+                    {getUserName(selectedRental)}
                   </p>
                 </div>
                 <div>
                   <h4 className="font-medium text-gray-700">Product</h4>
                   <p className="text-sm text-gray-600">
-                    {getProductName(selectedRental.productId)}
+                    {getProductName(selectedRental)}
                   </p>
                 </div>
               </div>
@@ -410,7 +431,7 @@ const Rentals = () => {
                 <div>
                   <h4 className="font-medium text-gray-700">Total Amount</h4>
                   <p className="text-sm text-gray-600">
-                    ${formatAmount(selectedRental.totalAmount)}
+                    ${formatAmount(getTotalAmount(selectedRental))}
                   </p>
                 </div>
                 <div>
