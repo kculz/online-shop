@@ -104,7 +104,7 @@ const Header = () => {
               <FaMicrochip className="text-white text-xl" />
             </div>
             <span className="text-xl font-bold bg-gradient-to-r from-blue-600 to-green-600 bg-clip-text text-transparent">
-              TechHub
+              I.T MarketPlace
             </span>
           </Link>
 

@@ -22,7 +22,7 @@ const Footer = () => {
           {/* Company info */}
           <div className="md:col-span-1">
             <h3 className="text-2xl font-bold mb-4 bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
-              ShopNow
+              I.T MarketPlace
             </h3>
             <p className="text-gray-400 mb-4 leading-relaxed">
               Your trusted online shopping destination with quality products and exceptional service.
@@ -72,7 +72,7 @@ const Footer = () => {
               </div>
               <div className="flex items-center space-x-3">
                 <Mail className="w-4 h-4 text-blue-400" />
-                <span className="text-gray-400 text-sm">help@shopnow.com</span>
+                <span className="text-gray-400 text-sm">help@I.T MarketPlace.com</span>
               </div>
               <div className="flex items-start space-x-3">
                 <MapPin className="w-4 h-4 text-blue-400 mt-0.5" />
@@ -133,7 +133,7 @@ const Footer = () => {
         <div className="container mx-auto px-6 py-4">
           <div className="flex flex-col md:flex-row justify-between items-center space-y-2 md:space-y-0">
             <div className="text-sm text-gray-400">
-              © 2025 ShopNow. All rights reserved.
+              © 2025 I.T MarketPlace. All rights reserved.
             </div>
            
           </div>
